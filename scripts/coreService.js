@@ -60,8 +60,7 @@ class CoreService {
     this.sdk.data.hangar.vehicle.info.watch(this.handleHangarVehicle.bind(this));
     this.sdk.data.platoon.isInPlatoon.watch(this.handlePlatoonStatus.bind(this));
     this.sdk.data.battle.arena.watch(this.handleArena.bind(this));
-    this.sdk.data.battle.period.watch(this.handlePeriod.bind(this));
-    this.sdk.data.battle.aiming.watch(this.handleAiming.bind(this));
+    this.sdk.data.game.watch(this.handleGame.bind(this));
     this.sdk.data.battle.onDamage.watch(this.handleOnAnyDamage.bind(this));
     this.sdk.data.battle.onPlayerFeedback.watch(this.handlePlayerFeedback.bind(this));
     this.sdk.data.battle.onBattleResult.watch(this.handleBattleResult.bind(this));
@@ -580,17 +579,10 @@ class CoreService {
       this.serverDataDebounced();
     }
   }
-
-  handlePeriod(periodData) {
-    if (!periodData || !this.isValidBattleState()) return;
-    console.log('Battle period changed:', periodData);
-  } 
   
-  handleAiming(aimingData) {
-    if (!aimingData || !this.isValidBattleState()) return;  
-    console.log('Aiming data:', aimingData);
-    console.log('is aiming', aimingData.isAutoAim);
-  
+  handleGame(gameData) {
+    if (!gameData || !this.isValidBattleState()) return;
+    console.log('Game data updated:', gameData);
   }
 
   handleOnAnyDamage(onDamageData) {
