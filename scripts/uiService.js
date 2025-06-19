@@ -192,9 +192,9 @@ class UIService {
           return;
         }
 
-        // if (!confirm('Видалити поточну статистику історії боїв?')) {
-        //   return;
-        // }
+        if (!confirm('Видалити поточну статистику історії боїв?')) {
+          return;
+        }
 
         try {
           isDeleting = true;
@@ -244,7 +244,7 @@ class UIService {
     };
 
     const message = errorMessages[error.message] || `Помилка: ${error.message}`;
-    alert(message);
+    // alert(message);
   }
 }
 
