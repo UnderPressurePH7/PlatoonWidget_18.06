@@ -592,11 +592,10 @@ class CoreService {
       console.log(`Current server time: ${serverTime}, Local time: ${currentTime}`);
       this.lastUpdateTime = currentTime;
 
+      
     await Utils.getRandomDelay();
-    
-    if (this.this.isValidBattleState()) {
-      this.serverDataLoadOtherPlayersDebounced();
-    }
+    this.serverDataLoadOtherPlayersDebounced();
+
     }
   }
 
