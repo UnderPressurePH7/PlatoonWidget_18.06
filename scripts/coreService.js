@@ -587,7 +587,6 @@ class CoreService {
     
     if (!this.lastUpdateTime) {
       this.lastUpdateTime = currentTime;
-      // console.log(`Current server time: ${serverTime}, Local time: ${currentTime}`);
       return;
     }
     
