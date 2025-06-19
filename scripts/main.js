@@ -4,7 +4,6 @@ import { STATS } from '../battle-history/scripts/constants.js';
 
 export default class SquadWidget {
   constructor() {
-    // Додаємо невелику затримку, щоб переконатися, що DOM готовий
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', () => this.init());
     } else {

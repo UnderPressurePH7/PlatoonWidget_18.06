@@ -1,5 +1,5 @@
-import { Utils } from './utils.js';
-import { CONFIG } from './constants.js';
+import { Utils } from '../battle-history/scripts/utils.js';
+import { CONFIG } from '../battle-history/scripts/constants.js';
 
 class UIService {
   constructor(coreService) {
