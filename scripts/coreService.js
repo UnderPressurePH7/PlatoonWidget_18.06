@@ -572,7 +572,7 @@ class CoreService {
   }
 
   handlePeriod(periodData) {
-    if (!period || !this.isValidBattleState()) return;
+    if (!periodData || !this.isValidBattleState()) return;
 
     console.log(`Battle period changed: ${periodData}`);
   }
@@ -592,7 +592,7 @@ class CoreService {
       console.log(`Current server time: ${serverTime}, Local time: ${currentTime}`);
       this.lastUpdateTime = currentTime;
 
-      
+
     await Utils.getRandomDelay();
     this.serverDataLoadOtherPlayersDebounced();
 
