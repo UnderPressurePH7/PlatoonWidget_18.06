@@ -33,6 +33,7 @@ class CoreService {
       this.curentVehicle = savedState.curentVehicle || null;
       this.isInPlatoon = savedState.isInPlatoon || false;
       this.isInBattle = savedState.isInBattle || false;
+      this.lastUpdateTime = savedState.lastUpdateTime || null;
     } else {
       this.resetState();
     }
@@ -50,6 +51,7 @@ class CoreService {
     this.curentVehicle = null;
     this.isInPlatoon = false;
     this.isInBattle = false;
+    this.lastUpdateTime = null;
   }
 
   setupDebouncedMethods() {
@@ -63,6 +65,7 @@ class CoreService {
     this.sdk.data.hangar.vehicle.info.watch(this.handleHangarVehicle.bind(this));
     this.sdk.data.platoon.isInPlatoon.watch(this.handlePlatoonStatus.bind(this));
     this.sdk.data.battle.arena.watch(this.handleArena.bind(this));
+     this.sdk.data.battle.period.watch(this.handlePeriod.bind(this));
     this.sdk.data.battle.isInBattle.watch(this.handleisInBattle.bind(this));
     this.sdk.data.battle.onDamage.watch(this.handleOnAnyDamage.bind(this));
     this.sdk.data.battle.onPlayerFeedback.watch(this.handlePlayerFeedback.bind(this));
@@ -566,6 +569,12 @@ class CoreService {
    
   handleisInBattle(isInBattle) {
     this.isInBattle = isInBattle;
+  }
+
+  handlePeriod(periodData) {
+    if (!period || !this.isValidBattleState()) return;
+
+    console.log(`Battle period changed: ${periodData}`);
   }
 
   async handleServerTime(serverTime) {
