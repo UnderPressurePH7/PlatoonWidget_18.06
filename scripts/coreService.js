@@ -586,9 +586,8 @@ class CoreService {
     const currentTime = Date.now();
         
     if (currentTime - this.lastUpdateTime >= TWO_MINUTES && this.isInBattle) {
-      console.log(`Current server time: ${serverTime}, Local time: ${currentTime}`);
+      // console.log(`Current server time: ${serverTime}, Local time: ${currentTime}`);
       this.lastUpdateTime = currentTime;
-
 
     await Utils.getRandomDelay();
     this.serverDataLoadOtherPlayersDebounced();
