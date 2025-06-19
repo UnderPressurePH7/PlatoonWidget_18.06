@@ -5,6 +5,7 @@ class UIService {
   constructor(coreService) {
     this.core = coreService;
     this.updateThrottle = Utils.throttle(this.updatePlayersUI.bind(this), CONFIG.THROTTLE_DELAY);
+    this.boundHandlers = {}; 
     
     this.core.eventsCore.on('statsUpdated', this.updateThrottle);
     this.setupEventListeners();
@@ -152,9 +153,13 @@ class UIService {
     const refreshBtn = document.getElementById('refresh-btn');
     if (!refreshBtn) return;
 
+    if (this.boundHandlers.refresh) {
+      refreshBtn.removeEventListener('click', this.boundHandlers.refresh);
+    }
+
     let isLoading = false;
     
-    refreshBtn.addEventListener('click', async () => {
+    this.boundHandlers.refresh = async () => {
       if (isLoading) {
         alert('Оновлення вже виконується, зачекайте будь ласка.');
         return;
@@ -177,64 +182,77 @@ class UIService {
         refreshBtn.disabled = false;
         refreshBtn.textContent = 'Оновити дані';
       }
-    });
+    };
+
+    refreshBtn.addEventListener('click', this.boundHandlers.refresh);
   }
 
-    setupRemoveHistoryButton() {
-      const restoreBtn = document.getElementById('remove-history-btn');
-      if (!restoreBtn) return;
+  setupRemoveHistoryButton() {
+    const restoreBtn = document.getElementById('remove-history-btn');
+    if (!restoreBtn) return;
 
-      let isDeleting = false;
-    
-      restoreBtn.addEventListener('click', async () => {
-        if (isDeleting) {
-          alert('Процес видалення вже виконується, зачекайте будь ласка.');
-          return;
-        }
+    if (this.boundHandlers.removeHistory) {
+      restoreBtn.removeEventListener('click', this.boundHandlers.removeHistory);
+    }
 
-        if (!confirm('Видалити поточну статистику історії боїв?')) {
-          return;
-        }
-        
-        alert('Це не зворотня дія, видалити?.');
+    let isDeleting = false;
+
+    this.boundHandlers.removeHistory = async () => {
+      if (isDeleting) {
+        alert('Процес видалення вже виконується, зачекайте будь ласка.');
+        return;
+      }
+
+      if (!confirm('Видалити поточну статистику історії боїв?')) {
+        return;
+      }
+
+      try {
+        isDeleting = true;
+        restoreBtn.disabled = true;
+        restoreBtn.textContent = 'Видалення...';
 
         try {
-          isDeleting = true;
-          restoreBtn.disabled = true;
-          restoreBtn.textContent = 'Видалення...';
-
-          try {
-            await this.core.loadFromServer();
-          } catch (loadError) {
-            console.warn('Попередження при завантаженні даних:', loadError);
-          }
-
-          await this.core.clearServerData();
-          this.core.clearState();
-          this.updatePlayersUI();
-          
-          localStorage.clear();
-          this.resetTeamStatsUI();
-
-        } catch (error) {
-          console.error('Помилка при видаленні статистики:', error);
-          this.handleError(error);
-        } finally {
-          isDeleting = false;
-          restoreBtn.disabled = false;
-          restoreBtn.textContent = 'Видалити історію';
+          await this.core.loadFromServer();
+        } catch (loadError) {
+          console.warn('Попередження при завантаженні даних:', loadError);
         }
-      });
-    }
+
+        await this.core.clearServerData();
+        this.core.clearState();
+        this.updatePlayersUI();
+        
+        localStorage.clear();
+        this.resetTeamStatsUI();
+
+      } catch (error) {
+        console.error('Помилка при видаленні статистики:', error);
+        this.handleError(error);
+      } finally {
+        isDeleting = false;
+        restoreBtn.disabled = false;
+        restoreBtn.textContent = 'Видалити історію';
+      }
+    };
+
+    restoreBtn.addEventListener('click', this.boundHandlers.removeHistory);
+  }
 
   setupViewHistoryButton() {
     const viewHistoryBtn = document.getElementById('view-history-btn');
     if (!viewHistoryBtn) return;
 
+    if (this.boundHandlers.viewHistory) {
+      viewHistoryBtn.removeEventListener('click', this.boundHandlers.viewHistory);
+    }
+
     const accessKey = this.core.getAccessKey();
-    viewHistoryBtn.addEventListener('click', () => {
+    
+    this.boundHandlers.viewHistory = () => {
       window.open('./battle-history/?' + accessKey, '_blank');
-    });
+    };
+
+    viewHistoryBtn.addEventListener('click', this.boundHandlers.viewHistory);
   }
 
   handleError(error) {
@@ -246,7 +264,27 @@ class UIService {
     };
 
     const message = errorMessages[error.message] || `Помилка: ${error.message}`;
-    // alert(message);
+    alert(message);
+  }
+
+  destroy() {
+    const refreshBtn = document.getElementById('refresh-btn');
+    const restoreBtn = document.getElementById('remove-history-btn');
+    const viewHistoryBtn = document.getElementById('view-history-btn');
+
+    if (refreshBtn && this.boundHandlers.refresh) {
+      refreshBtn.removeEventListener('click', this.boundHandlers.refresh);
+    }
+    
+    if (restoreBtn && this.boundHandlers.removeHistory) {
+      restoreBtn.removeEventListener('click', this.boundHandlers.removeHistory);
+    }
+    
+    if (viewHistoryBtn && this.boundHandlers.viewHistory) {
+      viewHistoryBtn.removeEventListener('click', this.boundHandlers.viewHistory);
+    }
+
+    this.boundHandlers = {};
   }
 }
 
