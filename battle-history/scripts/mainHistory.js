@@ -30,7 +30,7 @@ class MainHistory {
             this.initialize();
         } catch (error) {
             console.error('Error initializing services:', error);
-            this.showError('Помилка при ініціалізації сервісів');
+            this.showError('Error when initializing services');
         }
     }
 
