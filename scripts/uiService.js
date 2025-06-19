@@ -1,30 +1,29 @@
+import { Utils } from './utils.js';
+import { CONFIG } from './constants.js';
+
 class UIService {
   constructor(coreService) {
     this.core = coreService;
-    this.CONFIG = {
-      MAX_NAME_LENGTH: 16,
-      SMALL_FONT_THRESHOLD: 2
-    };
-
-    this.core.eventsCore.on('statsUpdated', () => this.updatePlayersUI());
+    this.updateThrottle = Utils.throttle(this.updatePlayersUI.bind(this), CONFIG.THROTTLE_DELAY);
+    
+    this.core.eventsCore.on('statsUpdated', this.updateThrottle);
     this.setupEventListeners();
   }
 
   updatePlayersUI() {
     const container = document.getElementById('player-container');
     if (!container) return;
+    
+    container.innerHTML = '';
 
-    const fragment = document.createDocumentFragment();
     const uniquePlayerIds = this.core.getPlayersIds();
 
     if (uniquePlayerIds.length === 0) {
-      this.showEmptyMessage(fragment);
-    } else {
-      this.renderPlayerRows(fragment, uniquePlayerIds);
+      this.showEmptyMessage(container);
+      return;
     }
 
-    container.innerHTML = '';
-    container.appendChild(fragment);
+    this.renderPlayerRows(container, uniquePlayerIds);
     this.updateTeamStatsUI();
   }
 
@@ -36,38 +35,51 @@ class UIService {
   }
 
   renderPlayerRows(container, playerIds) {
-    const playerRowStyle = playerIds.length > this.CONFIG.SMALL_FONT_THRESHOLD ? 'font-size: 12px;' : '';
+    const playerRowStyle = playerIds.length > 2 ? 'font-size: 12px;' : '';
 
     playerIds.forEach(playerId => {
       const playerName = this.core.PlayersInfo[playerId];
-      if (playerName) {
-        const playerRow = this.createPlayerRow(playerId, playerRowStyle);
-        container.appendChild(playerRow);
-      }
+      if (!playerName) return;
+
+      const playerRow = this.createPlayerRow(playerId, playerRowStyle);
+      container.appendChild(playerRow);
     });
   }
 
   createPlayerRow(playerId, style) {
     const playerRow = document.createElement('div');
     playerRow.className = 'player-row';
-    if (style) playerRow.style.cssText = style;
+    if (style) playerRow.style = style;
 
     const playerName = this.core.PlayersInfo[playerId];
-    const cleanName = this.formatPlayerName(playerName);
-    const displayName = this.truncateName(cleanName);
+    const arenaId = this.core.curentArenaId;
+    const cleanName = Utils.formatPlayerName(playerName);
+    const displayName = Utils.truncateName(cleanName);
 
-    const { battleDamage, battleKills } = this.getBattleStats(playerId);
-    const { playerDamage, playerKills, playerPoints } = this.core.calculatePlayerData(playerId);
+    let battleDamage = 0;
+    let battleKills = 0;
+
+    if (arenaId && this.core.BattleStats[arenaId] &&
+      this.core.BattleStats[arenaId].players &&
+      this.core.BattleStats[arenaId].players[playerId]) {
+      battleDamage = this.core.BattleStats[arenaId].players[playerId].damage || 0;
+      battleKills = this.core.BattleStats[arenaId].players[playerId].kills || 0;
+    }
+
+    const totalPlayerData = this.core.calculatePlayerData(playerId);
+    const displayDamage = totalPlayerData.playerDamage;
+    const displayKills = totalPlayerData.playerKills;
+    const playerPoints = totalPlayerData.playerPoints;
 
     playerRow.innerHTML = `
       <div class="player-name" title="${cleanName}">${displayName}</div>
       <div class="stat-column">
         <div class="damage">+${battleDamage.toLocaleString()}</div>
-        <div class="damage-in-battle" style="font-size: 9px; color: #ff6a00;">${playerDamage.toLocaleString()}</div>
+        <div class="damage-in-battle" style="font-size: 9px; color: #ff6a00;">${displayDamage.toLocaleString()}</div>
       </div>
       <div class="stat-column">
         <div class="frags">+${battleKills}</div>
-        <div class="frags-in-battle" style="font-size: 9px; color: #00a8ff;">${playerKills}</div>
+        <div class="frags-in-battle" style="font-size: 9px; color: #00a8ff;">${displayKills}</div>
       </div>
       <div class="stat-column" style="display:none">
         <div class="points">${playerPoints.toLocaleString()}</div>
@@ -77,42 +89,39 @@ class UIService {
     return playerRow;
   }
 
-  getBattleStats(playerId) {
-    const arenaId = this.core.curentArenaId;
-    const player = this.core.BattleStats[arenaId]?.players?.[playerId];
-    
-    return {
-      battleDamage: player?.damage || 0,
-      battleKills: player?.kills || 0
-    };
-  }
-
   updateTeamStatsUI() {
     const teamStats = this.core.calculateTeamData();
     const totalBattlePoints = this.core.calculateBattleData();
+    
     const battleStats = this.core.findBestAndWorstBattle();
-
-    this.updateElement('best-battle', battleStats.bestBattle?.points || 0);
-    this.updateElement('worst-battle', battleStats.worstBattle?.points || 0);
+    
+    this.updateElement('best-battle', battleStats.bestBattle?.points?.toLocaleString() || '0');
+    this.updateElement('worst-battle', battleStats.worstBattle?.points?.toLocaleString() || '0');
     this.updateElement('battles-count', `${teamStats.wins}/${teamStats.battles}`);
-    this.updateElement('team-now-points', totalBattlePoints.battlePoints);
-    this.updateElement('team-points', teamStats.teamPoints);
+    this.updateElement('team-now-points', totalBattlePoints.battlePoints.toLocaleString());
+    this.updateElement('team-points', teamStats.teamPoints.toLocaleString());
   }
 
   updateElement(id, value) {
     const element = document.getElementById(id);
     if (element) {
-      element.textContent = typeof value === 'number' ? value.toLocaleString() : value;
+      element.textContent = value;
     }
   }
 
   showSaveNotification() {
     const notification = document.createElement('div');
     Object.assign(notification.style, {
-      position: 'fixed', bottom: '20px', right: '20px',
-      backgroundColor: 'rgba(46, 204, 113, 0.9)', color: 'white',
-      padding: '10px 15px', borderRadius: '4px', fontWeight: '500',
-      zIndex: '9999', boxShadow: '0 2px 10px rgba(0, 0, 0, 0.2)'
+      position: 'fixed',
+      bottom: '20px',
+      right: '20px',
+      backgroundColor: 'rgba(46, 204, 113, 0.9)',
+      color: 'white',
+      padding: '10px 15px',
+      borderRadius: '4px',
+      fontWeight: '500',
+      zIndex: '9999',
+      boxShadow: '0 2px 10px rgba(0, 0, 0, 0.2)'
     });
 
     notification.textContent = 'Бій збережено в історію';
@@ -143,19 +152,22 @@ class UIService {
         return;
       }
 
-      isLoading = true;
-      this.setButtonState(refreshBtn, true, 'Оновлення...');
-
       try {
+        isLoading = true;
+        refreshBtn.disabled = true;
+        refreshBtn.textContent = 'Оновлення...';
+
         await this.core.loadFromServer();
         this.updatePlayersUI();
         this.core.saveState();
+
       } catch (error) {
         console.error('Помилка при оновленні даних:', error);
-        this.showErrorAlert(error);
+        this.handleError(error);
       } finally {
         isLoading = false;
-        this.setButtonState(refreshBtn, false, 'Оновити дані');
+        refreshBtn.disabled = false;
+        refreshBtn.textContent = 'Оновити дані';
       }
     });
   }
@@ -172,15 +184,18 @@ class UIService {
         return;
       }
 
-      if (!confirm('Видалити поточну статистику історії боїв?') || 
-          !confirm('Ви впевнені? Це незворотна дія!')) {
+      if (!confirm('Видалити поточну статистику історії боїв?')) {
+        return;
+      }
+      if (!confirm('Ви впевнені? Це незворотна дія!')) {
         return;
       }
 
-      isDeleting = true;
-      this.setButtonState(restoreBtn, true, 'Видалення...');
-
       try {
+        isDeleting = true;
+        restoreBtn.disabled = true;
+        restoreBtn.textContent = 'Видалення...';
+
         try {
           await this.core.loadFromServer();
         } catch (loadError) {
@@ -190,51 +205,40 @@ class UIService {
         await this.core.clearServerData();
         this.core.clearState();
         this.updatePlayersUI();
+
         alert('Статистику успішно видалено!');
+
       } catch (error) {
         console.error('Помилка при видаленні статистики:', error);
-        this.showErrorAlert(error);
+        this.handleError(error);
       } finally {
         isDeleting = false;
-        this.setButtonState(restoreBtn, false, 'Видалити історію');
+        restoreBtn.disabled = false;
+        restoreBtn.textContent = 'Видалити історію';
       }
     });
   }
 
   setupViewHistoryButton() {
     const viewHistoryBtn = document.getElementById('view-history-btn');
-    if (viewHistoryBtn) {
-      const accessKey = this.core.getAccessKey();
-      viewHistoryBtn.addEventListener('click', () => {
-        window.open('./battle-history/?' + accessKey, '_blank');
-      });
-    }
+    if (!viewHistoryBtn) return;
+
+    const accessKey = this.core.getAccessKey();
+    viewHistoryBtn.addEventListener('click', () => {
+      window.open('./battle-history/?' + accessKey, '_blank');
+    });
   }
 
-  setButtonState(button, disabled, text) {
-    button.disabled = disabled;
-    button.textContent = text;
-  }
-
-  showErrorAlert(error) {
+  handleError(error) {
     const errorMessages = {
       'Empty history': 'Історія боїв порожня.',
       'Network error': 'Помилка з`єднання з сервером. Перевірте підключення до інтернету.',
-      'Permission denied': 'Немає прав для видалення даних.'
+      'Permission denied': 'Немає прав для виконання операції.',
+      'Access key not found': 'Ключ доступу не знайдено.'
     };
 
     const message = errorMessages[error.message] || `Помилка: ${error.message}`;
     alert(message);
-  }
-
-  formatPlayerName(name) {
-    return name ? String(name).replace(/\s*\[.*?\]/, '') : 'Невідомий гравець';
-  }
-
-  truncateName(name) {
-    if (!name) return 'Невідомий';
-    return name.length > this.CONFIG.MAX_NAME_LENGTH ? 
-           name.substring(0, this.CONFIG.MAX_NAME_LENGTH) + '...' : name;
   }
 }
 

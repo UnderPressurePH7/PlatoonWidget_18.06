@@ -1,24 +1,18 @@
 import EventEmitter from '../battle-history/scripts/eventEmitter.js';
 import { GAME_POINTS, STATS } from '../battle-history/scripts/constants.js';
+import { StateManager } from './stateManager.js';
+import { Utils } from './utils.js';
+import { CONFIG } from './constants.js';
 
 class CoreService {
   constructor() {
-    this.CONFIG = {
-      SERVER_TIMEOUT: 5000,
-      RETRY_ATTEMPTS: 2,
-      DEBOUNCE_DELAY: 1000,
-      SAVE_DELAY: 250,
-      MIN_RANDOM_DELAY: 10,
-      MAX_RANDOM_DELAY: 50
-    };
-
     this.initializeSDK();
     this.initializeState();
+    this.initializeCache();
     this.setupSDKListeners();
     this.eventsCore = new EventEmitter();
-    this.pendingOperations = new Set();
-    this.debounceServerUpdate = this.debounce(() => this.serverData(), this.CONFIG.DEBOUNCE_DELAY);
-    this.loadFromServer().catch(console.error);
+    this.setupDebouncedMethods();
+    this.loadFromServer();
   }
 
   initializeSDK() {
@@ -31,22 +25,21 @@ class CoreService {
   }
 
   initializeState() {
-    const savedState = this.loadLocalState();
+    const savedState = StateManager.loadState();
     if (savedState) {
-      Object.assign(this, savedState);
+      this.BattleStats = savedState.BattleStats || {};
+      this.PlayersInfo = savedState.PlayersInfo || {};
+      this.curentPlayerId = savedState.curentPlayerId || null;
+      this.curentArenaId = savedState.curentArenaId || null;
+      this.curentVehicle = savedState.curentVehicle || null;
+      this.isInPlatoon = savedState.isInPlatoon || false;
     } else {
       this.resetState();
     }
   }
 
-  loadLocalState() {
-    try {
-      const savedState = localStorage.getItem('gameState');
-      return savedState ? JSON.parse(savedState) : null;
-    } catch (error) {
-      console.error('Failed to load local state:', error);
-      return null;
-    }
+  initializeCache() {
+    this.calculationCache = new Map();
   }
 
   resetState() {
@@ -58,58 +51,46 @@ class CoreService {
     this.isInPlatoon = false;
   }
 
-  debounce(func, wait) {
-    let timeout;
-    return (...args) => {
-      clearTimeout(timeout);
-      timeout = setTimeout(() => func.apply(this, args), wait);
-    };
-  }
-
-  sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
-  getRandomDelay() {
-    const delay = Math.floor(Math.random() * (this.CONFIG.MAX_RANDOM_DELAY - this.CONFIG.MIN_RANDOM_DELAY + 5)) + this.CONFIG.MIN_RANDOM_DELAY;
-    return this.sleep(delay);
+  setupDebouncedMethods() {
+    this.serverDataDebounced = Utils.debounce(this.serverData.bind(this), CONFIG.DEBOUNCE_DELAY);
+    this.serverDataLoadOtherPlayersDebounced = Utils.debounce(this.serverDataLoadOtherPlayers.bind(this), CONFIG.DEBOUNCE_DELAY);
   }
 
   setupSDKListeners() {
-    const listeners = [
-      [this.sdk.data.hangar.isInHangar, this.handleHangarStatus],
-      [this.sdk.data.hangar.vehicle.info, this.handleHangarVehicle],
-      [this.sdk.data.platoon.isInPlatoon, this.handlePlatoonStatus],
-      [this.sdk.data.battle.arena, this.handleArena],
-      [this.sdk.data.battle.onDamage, this.handleOnAnyDamage],
-      [this.sdk.data.battle.onPlayerFeedback, this.handlePlayerFeedback],
-      [this.sdk.data.battle.onBattleResult, this.handleBattleResult]
-    ];
+    this.sdk.data.hangar.isInHangar.watch(this.handleHangarStatus.bind(this));
+    this.sdk.data.hangar.vehicle.info.watch(this.handleHangarVehicle.bind(this));
+    this.sdk.data.platoon.isInPlatoon.watch(this.handlePlatoonStatus.bind(this));
+    this.sdk.data.battle.arena.watch(this.handleArena.bind(this));
+    this.sdk.data.battle.onDamage.watch(this.handleOnAnyDamage.bind(this));
+    this.sdk.data.battle.onPlayerFeedback.watch(this.handlePlayerFeedback.bind(this));
+    this.sdk.data.battle.onBattleResult.watch(this.handleBattleResult.bind(this));
+  }
 
-    listeners.forEach(([observable, handler]) => {
-      observable.watch(handler.bind(this));
-    });
+  // Utility methods
+  isValidBattleState() {
+    return this.curentArenaId && this.curentPlayerId;
+  }
+
+  clearCalculationCache() {
+    this.calculationCache.clear();
   }
 
   saveState() {
-    try {
-      const state = {
-        BattleStats: this.BattleStats,
-        PlayersInfo: this.PlayersInfo,
-        curentPlayerId: this.curentPlayerId,
-        curentArenaId: this.curentArenaId,
-        curentVehicle: this.curentVehicle,
-        isInPlatoon: this.isInPlatoon
-      };
-      localStorage.setItem('gameState', JSON.stringify(state));
-    } catch (error) {
-      console.error('Failed to save state:', error);
-    }
+    const state = {
+      BattleStats: this.BattleStats,
+      PlayersInfo: this.PlayersInfo,
+      curentPlayerId: this.curentPlayerId,
+      curentArenaId: this.curentArenaId,
+      curentVehicle: this.curentVehicle,
+      isInPlatoon: this.isInPlatoon
+    };
+    StateManager.saveState(state);
   }
 
   clearState() {
-    localStorage.removeItem('gameState');
+    StateManager.clearState();
     this.resetState();
+    this.clearCalculationCache();
   }
 
   initializeBattleStats(arenaId, playerId) {
@@ -145,238 +126,363 @@ class CoreService {
   }
 
   isExistsPlayerRecord() {
-    return this.getPlayersIds().includes(this.curentPlayerId);
+    const playersIds = this.getPlayersIds();
+    return playersIds.includes(this.curentPlayerId);
   }
 
   findBestAndWorstBattle() {
-    const completedBattles = Object.entries(this.BattleStats)
-      .map(([arenaId, battle]) => ({ id: arenaId, ...battle }))
-      .filter(battle => battle.win !== -1);
+    const allBattles = Object.entries(this.BattleStats).map(([arenaId, battle]) => ({
+      id: arenaId,
+      ...battle
+    }));
+
+    if (!allBattles || allBattles.length === 0) {
+      return { bestBattle: null, worstBattle: null };
+    }
+
+    const completedBattles = allBattles.filter(battle => battle.win !== -1);
 
     if (completedBattles.length === 0) {
       return { bestBattle: null, worstBattle: null };
     }
 
-    let bestBattle = completedBattles[0];
-    let worstBattle = completedBattles[0];
-    let bestPoints = this.calculateBattlePoints(bestBattle);
-    let worstPoints = bestPoints;
+    try {
+      let worstBattle = completedBattles[0];
+      let bestBattle = completedBattles[0];
+      let worstBattlePoints = this.calculateBattlePoints(worstBattle);
+      let bestBattlePoints = worstBattlePoints;
 
-    completedBattles.forEach(battle => {
-      const points = this.calculateBattlePoints(battle);
-      if (points > bestPoints) {
-        bestBattle = battle;
-        bestPoints = points;
-      }
-      if (points < worstPoints) {
-        worstBattle = battle;
-        worstPoints = points;
-      }
-    });
+      completedBattles.forEach(battle => {
+        try {
+          const battlePoints = this.calculateBattlePoints(battle);
 
-    return {
-      bestBattle: { battle: bestBattle, points: bestPoints },
-      worstBattle: { battle: worstBattle, points: worstPoints }
-    };
+          if (battlePoints < worstBattlePoints) {
+            worstBattle = battle;
+            worstBattlePoints = battlePoints;
+          }
+
+          if (battlePoints > bestBattlePoints) {
+            bestBattle = battle;
+            bestBattlePoints = battlePoints;
+          }
+        } catch (error) {
+          console.error('Помилка при обчисленні даних бою:', error, battle);
+        }
+      });
+
+      return {
+        bestBattle: { battle: bestBattle, points: bestBattlePoints },
+        worstBattle: { battle: worstBattle, points: worstBattlePoints }
+      };
+    } catch (error) {
+      console.error('Помилка при пошуку найгіршого/найкращого бою:', error);
+      return { bestBattle: null, worstBattle: null };
+    }
   }
 
   calculateBattlePoints(battle) {
-    let points = battle.win === 1 ? GAME_POINTS.POINTS_PER_TEAM_WIN : 0;
-    
-    if (battle.players) {
-      points += Object.values(battle.players).reduce((sum, player) => sum + (player.points || 0), 0);
+    let battlePoints = 0;
+
+    if (battle.win === 1) {
+      battlePoints += GAME_POINTS.POINTS_PER_TEAM_WIN;
     }
-    
-    return points;
+
+    if (battle && battle.players) {
+      Object.values(battle.players).forEach(player => {
+        battlePoints += player.points || 0;
+      });
+    }
+
+    return battlePoints;
   }
 
   calculateBattleData(arenaId = this.curentArenaId) {
-    if (!this.BattleStats[arenaId]?.players) {
-      return { battlePoints: 0, battleDamage: 0, battleKills: 0 };
+    const cacheKey = `battle_${arenaId}`;
+    
+    if (this.calculationCache.has(cacheKey)) {
+      return this.calculationCache.get(cacheKey);
     }
 
-    return Object.values(this.BattleStats[arenaId].players).reduce((acc, player) => ({
-      battlePoints: acc.battlePoints + (player.points || 0),
-      battleDamage: acc.battleDamage + (player.damage || 0),
-      battleKills: acc.battleKills + (player.kills || 0)
-    }), { battlePoints: 0, battleDamage: 0, battleKills: 0 });
+    let battlePoints = 0;
+    let battleDamage = 0;
+    let battleKills = 0;
+
+    try {
+      if (this.BattleStats[arenaId] && this.BattleStats[arenaId].players) {
+        for (const playerId in this.BattleStats[arenaId].players) {
+          const player = this.BattleStats[arenaId].players[playerId];
+          battlePoints += player.points || 0;
+          battleDamage += player.damage || 0;
+          battleKills += player.kills || 0;
+        }
+      }
+    } catch (error) {
+      console.error('Помилка при розрахунку бойових даних:', error);
+    }
+
+    const result = { battlePoints, battleDamage, battleKills };
+    this.calculationCache.set(cacheKey, result);
+    return result;
   }
 
   calculatePlayerData(playerId) {
-    return Object.values(this.BattleStats).reduce((acc, battle) => {
-      const player = battle.players?.[playerId];
-      if (player) {
-        acc.playerPoints += player.points || 0;
-        acc.playerDamage += player.damage || 0;
-        acc.playerKills += player.kills || 0;
+    const cacheKey = `player_${playerId}_${Object.keys(this.BattleStats).length}`;
+    
+    if (this.calculationCache.has(cacheKey)) {
+      return this.calculationCache.get(cacheKey);
+    }
+
+    let playerPoints = 0;
+    let playerDamage = 0;
+    let playerKills = 0;
+
+    try {
+      for (const arenaId in this.BattleStats) {
+        const player = this.BattleStats[arenaId].players[playerId];
+        if (player) {
+          playerPoints += player.points || 0;
+          playerDamage += player.damage || 0;
+          playerKills += player.kills || 0;
+        }
       }
-      return acc;
-    }, { playerPoints: 0, playerDamage: 0, playerKills: 0 });
+    } catch (error) {
+      console.error('Помилка при розрахунку даних гравця:', error);
+    }
+
+    const result = { playerPoints, playerDamage, playerKills };
+    this.calculationCache.set(cacheKey, result);
+    return result;
   }
 
   calculateTeamData() {
-    return Object.values(this.BattleStats).reduce((acc, battle) => {
-      acc.battles++;
-      if (battle.win === 1) {
-        acc.teamPoints += GAME_POINTS.POINTS_PER_TEAM_WIN;
-        acc.wins++;
+    const cacheKey = `team_${Object.keys(this.BattleStats).length}`;
+    
+    if (this.calculationCache.has(cacheKey)) {
+      return this.calculationCache.get(cacheKey);
+    }
+
+    let teamPoints = 0;
+    let teamDamage = 0;
+    let teamKills = 0;
+    let wins = 0;
+    let battles = 0;
+
+    try {
+      for (const arenaId in this.BattleStats) {
+        battles++;
+        if (this.BattleStats[arenaId].win === 1) {
+          teamPoints += GAME_POINTS.POINTS_PER_TEAM_WIN;
+          wins++;
+        }
+
+        for (const playerId in this.BattleStats[arenaId].players) {
+          const player = this.BattleStats[arenaId].players[playerId];
+          teamPoints += player.points || 0;
+          teamDamage += player.damage || 0;
+          teamKills += player.kills || 0;
+        }
       }
+    } catch (error) {
+      console.error('Помилка при розрахунку даних команди:', error);
+    }
 
-      Object.values(battle.players || {}).forEach(player => {
-        acc.teamPoints += player.points || 0;
-        acc.teamDamage += player.damage || 0;
-        acc.teamKills += player.kills || 0;
-      });
-
-      return acc;
-    }, { teamPoints: 0, teamDamage: 0, teamKills: 0, wins: 0, battles: 0 });
+    const result = { teamPoints, teamDamage, teamKills, wins, battles };
+    this.calculationCache.set(cacheKey, result);
+    return result;
   }
 
   getAccessKey() {
-    return localStorage.getItem('accessKey');
+    return StateManager.getAccessKey();
   }
 
-  async makeRequest(url, options = {}) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.CONFIG.SERVER_TIMEOUT);
-
-    try {
-      const response = await fetch(url, {
-        ...options,
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
-      return response;
-    } catch (error) {
-      clearTimeout(timeoutId);
-      throw error;
-    }
-  }
-
-  async saveToServer(retries = this.CONFIG.RETRY_ATTEMPTS) {
+  async saveToServer(retries = CONFIG.RETRY_ATTEMPTS) {
     const accessKey = this.getAccessKey();
-    if (!accessKey) throw new Error('Access key not found');
+    if (!accessKey) {
+      throw new Error('Access key not found');
+    }
 
-    const operationId = `save-${Date.now()}`;
-    if (this.pendingOperations.has(operationId)) return false;
-    
-    this.pendingOperations.add(operationId);
+    for (let i = 0; i < retries; i++) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), CONFIG.SERVER_TIMEOUT);
 
-    try {
-      for (let i = 0; i < retries; i++) {
-        try {
-          const response = await this.makeRequest(`${atob(STATS.BATTLE)}${accessKey}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Player-ID': this.curentPlayerId
-            },
-            body: JSON.stringify({
-              BattleStats: this.BattleStats,
-              PlayerInfo: this.PlayersInfo,
-            })
-          });
+        const response = await fetch(`${atob(STATS.BATTLE)}${accessKey}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Player-ID': this.curentPlayerId
+          },
+          body: JSON.stringify({
+            BattleStats: this.BattleStats,
+            PlayerInfo: this.PlayersInfo,
+          }),
+          signal: controller.signal
+        });
 
-          if (response.ok || response.status === 202) return true;
-          if (response.status >= 400 && response.status < 500) throw new Error(`Client error: ${response.status}`);
+        clearTimeout(timeoutId);
+
+        if (!response.ok && response.status !== 202) {
           throw new Error(`Server error: ${response.status}`);
-
-        } catch (error) {
-          if (i === retries - 1) throw error;
-          await this.sleep(750 * (i + 1));
         }
+
+        return true;
+
+      } catch (error) {
+        console.error(`Attempt ${i + 1} failed:`, error);
+        if (i === retries - 1) throw error;
+        await Utils.sleep(CONFIG.RETRY_DELAY * (i + 1));
       }
-    } finally {
-      this.pendingOperations.delete(operationId);
     }
     return false;
   }
 
   async loadFromServer() {
-    const accessKey = this.getAccessKey();
-    if (!accessKey) throw new Error('Access key not found');
+    try {
+      const accessKey = this.getAccessKey();
+      if (!accessKey) {
+        throw new Error('Access key not found');
+      }
 
-    const response = await this.makeRequest(`${atob(STATS.BATTLE)}${accessKey}`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' }
-    });
+      const response = await fetch(`${atob(STATS.BATTLE)}${accessKey}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
 
-    if (!response.ok) throw new Error(`Load error: ${response.statusText}`);
+      if (!response.ok) {
+        throw new Error(`Помилка при завантаженні даних: ${response.statusText}`);
+      }
 
-    const data = await response.json();
-    if (data.success) {
-      if (data.BattleStats) this.BattleStats = data.BattleStats;
-      if (data.PlayerInfo) this.PlayersInfo = data.PlayerInfo;
+      const data = await response.json();
+
+      if (data.success) {
+        if (data.BattleStats) {
+          this.BattleStats = data.BattleStats;
+        }
+        if (data.PlayerInfo) {
+          this.PlayersInfo = data.PlayerInfo;
+        }
+        this.clearCalculationCache();
+      }
+      return true;
+    } catch (error) {
+      console.error('Помилка при завантаженні даних із сервера:', error);
+      throw error;
     }
-    return true;
   }
 
   async loadFromServerOtherPlayers() {
-    const accessKey = this.getAccessKey();
-    if (!accessKey) throw new Error('Access key not found');
-
-    const response = await this.makeRequest(`${atob(STATS.BATTLE)}pid/${accessKey}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Player-ID': this.curentPlayerId
+    try {
+      const accessKey = this.getAccessKey();
+      if (!accessKey) {
+        throw new Error('Access key not found');
       }
-    });
 
-    if (!response.ok) throw new Error(`Load error: ${response.statusText}`);
+      const response = await fetch(`${atob(STATS.BATTLE)}pid/${accessKey}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Player-ID': this.curentPlayerId
+        },
+      });
 
-    const data = await response.json();
-    if (data.BattleStats) {
-      this.mergeBattleStats(data.BattleStats);
-      return true;
-    }
-    return false;
-  }
+      if (!response.ok) {
+        throw new Error(`Помилка при завантаженні даних: ${response.statusText}`);
+      }
 
-  mergeBattleStats(newBattleStats) {
-    Object.entries(newBattleStats).forEach(([battleId, newBattleData]) => {
-      const existingBattle = this.BattleStats[battleId];
+      const data = await response.json();
 
-      if (existingBattle) {
-        this.BattleStats[battleId] = {
-          ...existingBattle,
-          startTime: newBattleData.startTime,
-          duration: newBattleData.duration,
-          win: newBattleData.win,
-          mapName: newBattleData.mapName,
-          players: { ...existingBattle.players }
-        };
+      if (data.BattleStats) {
+        Object.entries(data.BattleStats).forEach(([battleId, newBattleData]) => {
+          const existingBattle = this.BattleStats[battleId];
 
-        Object.entries(newBattleData.players).forEach(([playerId, newPlayerData]) => {
-          const existingPlayer = existingBattle.players[playerId];
-          this.BattleStats[battleId].players[playerId] = existingPlayer ? {
-            name: newPlayerData.name,
-            vehicle: newPlayerData.vehicle,
-            damage: Math.max(existingPlayer.damage || 0, newPlayerData.damage || 0),
-            kills: Math.max(existingPlayer.kills || 0, newPlayerData.kills || 0),
-            points: Math.max(existingPlayer.points || 0, newPlayerData.points || 0)
-          } : newPlayerData;
+          if (existingBattle) {
+            this.BattleStats[battleId] = {
+              ...existingBattle,
+              startTime: newBattleData.startTime,
+              duration: newBattleData.duration,
+              win: newBattleData.win,
+              mapName: newBattleData.mapName,
+              players: { ...existingBattle.players }
+            };
+
+            Object.entries(newBattleData.players).forEach(([playerId, newPlayerData]) => {
+              const existingPlayer = existingBattle.players[playerId];
+
+              if (existingPlayer) {
+                this.BattleStats[battleId].players[playerId] = {
+                  name: newPlayerData.name,
+                  vehicle: newPlayerData.vehicle,
+                  damage: Math.max(existingPlayer.damage || 0, newPlayerData.damage || 0),
+                  kills: Math.max(existingPlayer.kills || 0, newPlayerData.kills || 0),
+                  points: Math.max(existingPlayer.points || 0, newPlayerData.points || 0)
+                };
+              } else {
+                this.BattleStats[battleId].players[playerId] = newPlayerData;
+              }
+            });
+          } else {
+            this.BattleStats[battleId] = newBattleData;
+          }
         });
-      } else {
-        this.BattleStats[battleId] = newBattleData;
+
+        this.clearCalculationCache();
+        return true;
       }
-    });
+
+      return false;
+    } catch (error) {
+      console.error('Помилка при завантаженні даних із сервера:', error);
+      throw error;
+    }
   }
 
   async clearServerData() {
-    const accessKey = this.getAccessKey();
-    const response = await this.makeRequest(`${atob(STATS.BATTLE)}clear/${accessKey}`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' }
-    });
+    try {
+      const accessKey = this.getAccessKey();
+      const response = await fetch(`${atob(STATS.BATTLE)}clear/${accessKey}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+      });
 
-    if (!response.ok) throw new Error(`Clear error: ${response.statusText}`);
+      if (!response.ok) {
+        throw new Error(`Помилка при очищенні даних: ${response.statusText}`);
+      }
 
-    const data = await response.json();
-    if (data.success) {
-      this.BattleStats = {};
-      this.PlayersInfo = {};
-      this.eventsCore.emit('statsUpdated');
+      const data = await response.json();
+      if (data.success) {
+        this.BattleStats = {};
+        this.PlayersInfo = {};
+        this.clearCalculationCache();
+        this.eventsCore.emit('statsUpdated');
+      }
+
+    } catch (error) {
+      console.error('Помилка при очищенні даних на сервері:', error);
+      throw error;
+    }
+  }
+
+  async warmupServer() {
+    try {
+      const response = await fetch(`${atob(STATS.STATUS)}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Помилка при завантаженні даних: ${response.statusText}`);
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Помилка при завантаженні даних із сервера:', error);
+      throw error;
     }
   }
 
@@ -384,7 +490,7 @@ class CoreService {
     try {
       await this.loadFromServer();
       this.eventsCore.emit('statsUpdated');
-      await this.sleep(50);
+      await Utils.sleep(CONFIG.UI_UPDATE_DELAY);
       this.saveState();
     } catch (error) {
       console.error('Error in serverDataLoad:', error);
@@ -394,7 +500,7 @@ class CoreService {
   async serverDataLoadOtherPlayers() {
     try {
       await this.loadFromServerOtherPlayers();
-      await this.sleep(50);
+      await Utils.sleep(CONFIG.UI_UPDATE_DELAY);
       this.eventsCore.emit('statsUpdated');
       this.saveState();
     } catch (error) {
@@ -413,9 +519,9 @@ class CoreService {
   async serverData() {
     try {
       await this.saveToServer();
-      await this.sleep(this.CONFIG.SAVE_DELAY);
+      await Utils.sleep(250);
       await this.loadFromServerOtherPlayers();
-      await this.sleep(50);
+      await Utils.sleep(CONFIG.UI_UPDATE_DELAY);
       this.eventsCore.emit('statsUpdated');
       this.saveState();
     } catch (error) {
@@ -423,6 +529,7 @@ class CoreService {
     }
   }
 
+  // Event handlers
   handlePlatoonStatus(isInPlatoon) {
     this.isInPlatoon = isInPlatoon;
     this.saveState();
@@ -431,7 +538,7 @@ class CoreService {
   async handleHangarStatus(isInHangar) {
     if (!isInHangar) return;
     
-    await this.sleep(1250);
+    await Utils.sleep(CONFIG.HANGAR_DELAY);
     const playersID = this.getPlayersIds();
     this.curentPlayerId = this.sdk.data.player.id.value;
     this.curentArenaId = null;
@@ -442,8 +549,9 @@ class CoreService {
     }
 
     this.PlayersInfo[this.curentPlayerId] = this.sdk.data.player.name.value;
-    await this.getRandomDelay();
-    this.debounceServerUpdate();
+
+    await Utils.getRandomDelay();
+    this.serverDataDebounced();
   }
 
   handleHangarVehicle(hangareVehicleData) {
@@ -455,86 +563,92 @@ class CoreService {
     if (!arenaData) return;
 
     this.curentArenaId = this.sdk?.data?.battle?.arenaId?.value ?? null;
-    if (!this.curentArenaId || !this.curentPlayerId) return;
+
+    if (this.curentArenaId == null) return;
+    if (this.curentPlayerId == null) return;
 
     if (this.isExistsPlayerRecord()) {
+      this.serverDataLoadOtherPlayersDebounced();
+      
       this.initializeBattleStats(this.curentArenaId, this.curentPlayerId);
+
       this.BattleStats[this.curentArenaId].mapName = arenaData.localizedName || 'Unknown Map';
       this.BattleStats[this.curentArenaId].players[this.curentPlayerId].vehicle = this.curentVehicle;
       this.BattleStats[this.curentArenaId].players[this.curentPlayerId].name = this.sdk.data.player.name.value;
-      this.debounceServerUpdate();
+
+      this.serverDataDebounced();
     }
   }
 
   handleOnAnyDamage(onDamageData) {
-    if (!onDamageData?.attacker?.playerId || !this.curentArenaId || !this.sdk.data.player.id.value) return;
+    if (!onDamageData || !onDamageData.attacker.playerId || !this.curentArenaId || !this.sdk.data.player.id.value) return;
 
     const playersID = this.getPlayersIds();
-    const attackerId = parseInt(onDamageData.attacker.playerId);
-    const currentPlayerId = this.sdk.data.player.id.value;
 
-    if (playersID.some(id => id === attackerId && id !== currentPlayerId)) {
-      this.serverDataLoadOtherPlayers();
+    for (const playerId of playersID) {
+      if (onDamageData.attacker.playerId === parseInt(playerId) && parseInt(playerId) !== this.sdk.data.player.id.value) {
+        this.serverDataLoadOtherPlayersDebounced();
+        break;
+      }
     }
   }
 
   handlePlayerFeedback(feedback) {
-    if (!feedback?.type) return;
+    if (!feedback || !feedback.type) return;
 
     const handlers = {
-      damage: this.handlePlayerDamage,
-      kill: this.handlePlayerKill,
-      radioAssist: this.serverDataLoadOtherPlayers,
-      trackAssist: this.serverDataLoadOtherPlayers,
-      tanking: this.serverDataLoadOtherPlayers,
-      receivedDamage: this.serverDataLoadOtherPlayers,
-      targetVisibility: this.handlePlayerTargetVisibility,
-      detected: this.handlePlayerDetected,
-      spotted: this.handlePlayerSpotted
+      'damage': this.handlePlayerDamage.bind(this),
+      'kill': this.handlePlayerKill.bind(this),
+      'radioAssist': this.handleGenericPlayerEvent.bind(this),
+      'trackAssist': this.handleGenericPlayerEvent.bind(this),
+      'tanking': this.handleGenericPlayerEvent.bind(this),
+      'receivedDamage': this.handleGenericPlayerEvent.bind(this),
+      'targetVisibility': this.handleGenericPlayerEvent.bind(this),
+      'detected': this.handleGenericPlayerEvent.bind(this),
+      'spotted': this.handleGenericPlayerEvent.bind(this)
     };
 
     const handler = handlers[feedback.type];
-    if (handler) handler.call(this, feedback.data);
+    if (handler) {
+      handler(feedback.data);
+    }
+  }
+
+  handleGenericPlayerEvent(eventData) {
+    if (!eventData || !this.isValidBattleState()) return;
+    this.serverDataLoadOtherPlayersDebounced();
   }
 
   handlePlayerDamage(damageData) {
-    if (!damageData || !this.curentArenaId || !this.curentPlayerId || !this.isExistsPlayerRecord()) return;
+    if (!damageData || !this.isValidBattleState()) return;
 
-    const player = this.BattleStats[this.curentArenaId].players[this.curentPlayerId];
-    player.damage += damageData.damage;
-    player.points += damageData.damage * GAME_POINTS.POINTS_PER_DAMAGE;
-    this.debounceServerUpdate();
+    const arenaId = this.curentArenaId;
+    const playerId = this.curentPlayerId;
+    
+    if (this.isExistsPlayerRecord()) {
+      this.BattleStats[arenaId].players[playerId].damage += damageData.damage;
+      this.BattleStats[arenaId].players[playerId].points += damageData.damage * GAME_POINTS.POINTS_PER_DAMAGE;
+      this.clearCalculationCache();
+      this.serverDataDebounced();
+    }
   }
 
   handlePlayerKill(killData) {
-    if (!killData || !this.curentArenaId || !this.curentPlayerId || !this.isExistsPlayerRecord()) return;
+    if (!killData || !this.isValidBattleState()) return;
 
-    const player = this.BattleStats[this.curentArenaId].players[this.curentPlayerId];
-    player.kills += 1;
-    player.points += GAME_POINTS.POINTS_PER_FRAG;
-    this.debounceServerUpdate();
-  }
-
-  handlePlayerTargetVisibility(targetVisibility) {
-    if (targetVisibility && this.curentArenaId && this.curentPlayerId) {
-      this.serverDataLoadOtherPlayers();
-    }
-  }
-
-  handlePlayerDetected(detected) {
-    if (detected && this.curentArenaId && this.curentPlayerId) {
-      this.serverDataLoadOtherPlayers();
-    }
-  }
-
-  handlePlayerSpotted(spotted) {
-    if (spotted && this.curentArenaId && this.curentPlayerId) {
-      this.serverDataLoadOtherPlayers();
+    const arenaId = this.curentArenaId;
+    const playerId = this.curentPlayerId;
+    
+    if (this.isExistsPlayerRecord()) {
+      this.BattleStats[arenaId].players[playerId].kills += 1;
+      this.BattleStats[arenaId].players[playerId].points += GAME_POINTS.POINTS_PER_FRAG;
+      this.clearCalculationCache();
+      this.serverDataDebounced();
     }
   }
 
   async handleBattleResult(result) {
-    if (!result?.vehicles || !result?.players) {
+    if (!result || !result.vehicles || !result.players) {
       console.error("Invalid battle result data");
       return;
     }
@@ -545,10 +659,10 @@ class CoreService {
     this.curentPlayerId = result.personal.avatar.accountDBID;
     this.BattleStats[arenaId].duration = result.common.duration;
 
-    const playerTeam = Number(result.players[this.curentPlayerId]?.team);
+    const playerTeam = Number(result.players[this.curentPlayerId].team);
     const winnerTeam = Number(result.common.winnerTeam);
 
-    if (playerTeam && winnerTeam !== undefined) {
+    if (playerTeam !== undefined && playerTeam !== 0 && winnerTeam !== undefined) {
       if (playerTeam === winnerTeam) {
         this.BattleStats[arenaId].win = 1;
       } else if (winnerTeam === 0) {
@@ -560,25 +674,23 @@ class CoreService {
 
     for (const vehicleId in result.vehicles) {
       const vehicles = result.vehicles[vehicleId];
-      const vehicle = vehicles.find(v => v.accountDBID === this.curentPlayerId);
-      
-      if (vehicle) {
-        const playerStats = this.BattleStats[arenaId].players[this.curentPlayerId];
-        playerStats.damage = vehicle.damageDealt;
-        playerStats.kills = vehicle.kills;
-        playerStats.points = vehicle.damageDealt + (vehicle.kills * GAME_POINTS.POINTS_PER_FRAG);
-        break;
+      for (const vehicle of vehicles) {
+        if (vehicle.accountDBID === this.curentPlayerId) {
+          const playerStats = this.BattleStats[arenaId].players[this.curentPlayerId];
+          playerStats.damage = vehicle.damageDealt;
+          playerStats.kills = vehicle.kills;
+          playerStats.points = vehicle.damageDealt + (vehicle.kills * GAME_POINTS.POINTS_PER_FRAG);
+          break;
+        }
       }
     }
 
-    await this.getRandomDelay();
+    this.clearCalculationCache();
+    await Utils.getRandomDelay();
+    
     if (this.isExistsPlayerRecord()) {
-      this.debounceServerUpdate();
+      this.serverDataDebounced();
     }
-  }
-
-  cleanup() {
-    this.pendingOperations.clear();
   }
 }
 
