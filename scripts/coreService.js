@@ -1,7 +1,7 @@
-import EventEmitter from '../utils/eventEmitter.js';
-import { GAME_POINTS, STATS, CONFIG} from '../utils/constants.js';
-import { StateManager } from '../utils/stateManager.js';
-import { Utils } from '../utils/utils.js';
+import EventEmitter from '../battle-history/utils/eventEmitter.js';
+import { GAME_POINTS, STATS, CONFIG} from '../battle-history/utils/constants.js';
+import { StateManager } from '../battle-history/utils/stateManager.js';
+import { Utils } from '../battle-history/utils/utils.js';
 
 class CoreService {
   constructor() {
