@@ -4,22 +4,28 @@ import { STATS } from '../battle-history/scripts/constants.js';
 
 export default class SquadWidget {
   constructor() {
-    this.init();
+    // Додаємо невелику затримку, щоб переконатися, що DOM готовий
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => this.init());
+    } else {
+      this.init();
+    }
   }
 
   async init() {
+    console.log('SquadWidget initializing...');
     try {
-
-
       const hasAccess = await this.checkAccessKey();
+      console.log('Access check result:', hasAccess);
       
       if (!hasAccess) {
+        console.log('No access - showing access denied');
         this.showAccessDenied();
         return;
-      
       }
+      
+      console.log('Access granted - initializing services');
       this.initializeServices();
-      // await this.warmupServer();
     } catch (error) {
       console.error('Error in init:', error);
       this.showAccessDenied();
@@ -33,78 +39,39 @@ export default class SquadWidget {
       this.initialize();
     } catch (error) {
       console.error('Error initializing services:', error);
+      this.showAccessDenied();
     }
   }
 
   initialize() {
     try {
-      this.coreService.loadFromServer();
-      this.uiService.updatePlayersUI();
+      this.coreService.loadFromServer()
+        .then(() => {
+          this.uiService.updatePlayersUI();
+        })
+        .catch(error => {
+          console.error('Error loading data:', error);
+          this.uiService.updatePlayersUI();
+        });
     } catch (error) {
       console.error('Error in initialize:', error);
     }
   }
 
-//   async warmupServer() {
-//     try {
-//         const statusUrl = `${atob(STATS.STATUS)}`;
-//         // console.log("Перевірка статусу сервера...");
-        
-//         const controller = new AbortController();
-//         const timeoutId = setTimeout(() => controller.abort(), 175000);
-        
-//         const response = await fetch(statusUrl, {
-//             method: 'GET',
-//             headers: {
-//                 'Content-Type': 'application/json'
-//             },
-//             signal: controller.signal
-//         });
-
-//         clearTimeout(timeoutId);
-
-//         if (!response.ok) {
-//             console.warn("Сервер не відповідає належним чином");
-//             return false;
-//         }
-
-//         const data = await response.json();
-        
-//         if (data.status === 'ok') {
-//             // console.log("Сервер активний та готовий до роботи", {
-//             //     timestamp: data.timestamp,
-//             //     database: data.database,
-//             //     uptime: data.uptime
-//             // });
-//             return true;
-//         } else {
-//             console.warn("Сервер повідомляє про проблеми:", data);
-//             return false;
-//         }
-
-//     } catch (error) {
-//         if (error.name === 'AbortError') {
-//             console.warn("Перевищено час очікування відповіді від сервера");
-//         } else {
-//             console.error("Помилка при перевірці статусу сервера:", error);
-//         }
-//         return false;
-//     } finally {
-
-//         await new Promise(resolve => setTimeout(resolve, 5000));
-//     }
-// }
-
   async checkAccessKey() {
     try {
+      console.log('Checking access key...');
       localStorage.removeItem('accessKey');
       const urlParams = window.location.search.substring(1);
+      console.log('URL params:', urlParams);
       
       if (!urlParams) {
+        console.log('No URL params found');
         return false;
       }
   
       const apiUrl = `${atob(STATS.BATTLE)}${urlParams}`;
+      console.log('Making request to:', apiUrl);
   
       const response = await fetch(apiUrl, {
         method: 'GET',
@@ -113,67 +80,106 @@ export default class SquadWidget {
         },
       });
   
+      console.log('Response status:', response.status);
+  
       if (response.status === 401) {
+        console.log('Unauthorized access');
         return false;
       }
   
       if (!response.ok) {
+        console.log('Response not ok:', response.status);
         throw new Error(`HTTP error! status: ${response.status}`);
       }
   
       const data = await response.json();
+      console.log('Response data:', data);
   
       if (data.success) {
         localStorage.setItem('accessKey', urlParams);
+        console.log('Access key saved');
         return true;
       }
       
+      console.log('Data success is false');
       return false;
   
     } catch (error) {
+      console.error('Error in checkAccessKey:', error);
       if (!(error instanceof Response) || error.status !== 401) {
-        console.error('Error in checkAccessKey:', error);
+        console.error('Detailed error:', error);
       }
       return false;
     }
   }
 
   showAccessDenied() {
+    console.log('Showing access denied screen');
     try {
-      const container = document.createElement('div');
-      container.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        background-color: var(--wotstat-background,rgba(255, 255, 255, 0));
-        z-index: 9999;
-      `;
+      // Очікуємо, поки DOM буде готовий
+      const showDenied = () => {
+        console.log('Creating access denied UI');
+        
+        // Очищаємо весь контент сторінки
+        document.body.innerHTML = '';
+        
+        const container = document.createElement('div');
+        container.id = 'access-denied-container';
+        container.style.cssText = `
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100vw;
+          height: 100vh;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          background-color: rgba(0, 0, 0, 0.8);
+          z-index: 99999;
+          font-family: Arial, sans-serif;
+        `;
 
-      const message = document.createElement('div');
-      message.style.cssText = `
-        text-align: center;
-        padding: 2em;
-        border-radius: 1em;
-        background-color: rgba(0, 0, 0, 0.7);
-        color: var(--wotstat-primary, #ffffff);
-      `;
+        const message = document.createElement('div');
+        message.style.cssText = `
+          text-align: center;
+          padding: 3em;
+          border-radius: 1em;
+          background-color: rgba(20, 20, 20, 0.95);
+          color: #ffffff;
+          border: 2px solid #ff4444;
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+          max-width: 400px;
+        `;
 
-      message.innerHTML = `
-        <h2>Доступ заборонено</h2>
-        <p>Невірний ключ доступу</p>
-      `;
+        message.innerHTML = `
+          <h2 style="color: #ff4444; margin-bottom: 1em; font-size: 1.5em;">Доступ заборонено</h2>
+          <p style="margin-bottom: 1em; font-size: 1.1em;">Невірний ключ доступу</p>
+          <p style="font-size: 0.9em; color: #cccccc;">Перевірте правильність посилання</p>
+        `;
 
-      container.appendChild(message);
+        container.appendChild(message);
+        document.body.appendChild(container);
+        
+        console.log('Access denied UI created');
+      };
 
-      document.body.innerHTML = '';
-      document.body.appendChild(container);
+      if (document.body) {
+        showDenied();
+      } else {
+        // Якщо body ще не готовий, чекаємо
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', showDenied);
+        } else {
+          // Якщо readyState не loading, але body немає, чекаємо трохи
+          setTimeout(showDenied, 100);
+        }
+      }
     } catch (error) {
       console.error('Error in showAccessDenied:', error);
+      alert('Доступ заборонено. Невірний ключ доступу.');
     }
   }
 }
+
+console.log('Creating SquadWidget instance...');
+new SquadWidget();
