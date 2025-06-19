@@ -1,17 +1,17 @@
-const GAME_POINTS = {
+export const GAME_POINTS = {
     POINTS_PER_DAMAGE: 1,
     POINTS_PER_FRAG: 400,
     POINTS_PER_TEAM_WIN: 2000
 };
 
-const STATS = {
+export const STATS = {
     BATTLE: "aHR0cHM6Ly9ub2RlLXNlcnZlcmpzLTUyY2Y0MTgyNmY3MS5oZXJva3VhcHAuY29tL2FwaS9iYXR0bGUtc3RhdHMv",
     STATUS: "aHR0cHM6Ly9ub2RlLXNlcnZlcmpzLTUyY2Y0MTgyNmY3MS5oZXJva3VhcHAuY29tL2FwaS9zdGF0dXM=",
     WS: "bm9kZS1zZXJ2ZXJqcy01MmNmNDE4MjZmNzEuaGVyb2t1YXBwLmNvbQ=="
 
 };
 
-const CONFIG = {
+export const CONFIG = {
   DEBOUNCE_DELAY: 500,
   THROTTLE_DELAY: 100,
   SERVER_TIMEOUT: 5000,
@@ -24,9 +24,8 @@ const CONFIG = {
   SERVER_WARMUP_DELAY: 5000
 };
 
-const CACHE_KEYS = {
+export const CACHE_KEYS = {
   GAME_STATE: 'gameState',
   ACCESS_KEY: 'accessKey'
 };
 
-export { GAME_POINTS, STATS, CONFIG};
