@@ -574,9 +574,9 @@ class CoreService {
   handlePeriod(period) {
     if (!period || !this.isValidBattleState()) return;
 
-    console.log('Battle period changed:',  period);
-    console.log('length periodData:', period.length);
-
+    if (period.tag == "PREBATTLE") {
+      this.lastUpdateTime = Date.now();
+    }
   }
 
   async handleServerTime(serverTime) {
@@ -584,12 +584,7 @@ class CoreService {
     
     const TWO_MINUTES = 2 * 60 * 1000;
     const currentTime = Date.now();
-    
-    if (!this.lastUpdateTime) {
-      this.lastUpdateTime = currentTime;
-      return;
-    }
-    
+        
     if (currentTime - this.lastUpdateTime >= TWO_MINUTES && this.isInBattle) {
       console.log(`Current server time: ${serverTime}, Local time: ${currentTime}`);
       this.lastUpdateTime = currentTime;
