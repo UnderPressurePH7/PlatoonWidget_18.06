@@ -9,12 +9,17 @@ export default class SquadWidget {
 
   async init() {
     try {
+
+
       const hasAccess = await this.checkAccessKey();
+      
       if (!hasAccess) {
         this.showAccessDenied();
         return;
+      
       }
       this.initializeServices();
+      // await this.warmupServer();
     } catch (error) {
       console.error('Error in init:', error);
       this.showAccessDenied();
@@ -28,45 +33,103 @@ export default class SquadWidget {
       this.initialize();
     } catch (error) {
       console.error('Error initializing services:', error);
-      this.showAccessDenied();
     }
   }
 
   initialize() {
     try {
-      // loadFromServer повертає проміс, але UI можна оновити після нього
-      this.coreService.loadFromServer()
-        .then(() => this.uiService.updatePlayersUI())
-        .catch(error => {
-          console.error('Error loading data:', error);
-          this.uiService.updatePlayersUI();
-        });
+      this.coreService.loadFromServer();
+      this.uiService.updatePlayersUI();
     } catch (error) {
       console.error('Error in initialize:', error);
     }
   }
 
+//   async warmupServer() {
+//     try {
+//         const statusUrl = `${atob(STATS.STATUS)}`;
+//         // console.log("Перевірка статусу сервера...");
+        
+//         const controller = new AbortController();
+//         const timeoutId = setTimeout(() => controller.abort(), 175000);
+        
+//         const response = await fetch(statusUrl, {
+//             method: 'GET',
+//             headers: {
+//                 'Content-Type': 'application/json'
+//             },
+//             signal: controller.signal
+//         });
+
+//         clearTimeout(timeoutId);
+
+//         if (!response.ok) {
+//             console.warn("Сервер не відповідає належним чином");
+//             return false;
+//         }
+
+//         const data = await response.json();
+        
+//         if (data.status === 'ok') {
+//             // console.log("Сервер активний та готовий до роботи", {
+//             //     timestamp: data.timestamp,
+//             //     database: data.database,
+//             //     uptime: data.uptime
+//             // });
+//             return true;
+//         } else {
+//             console.warn("Сервер повідомляє про проблеми:", data);
+//             return false;
+//         }
+
+//     } catch (error) {
+//         if (error.name === 'AbortError') {
+//             console.warn("Перевищено час очікування відповіді від сервера");
+//         } else {
+//             console.error("Помилка при перевірці статусу сервера:", error);
+//         }
+//         return false;
+//     } finally {
+
+//         await new Promise(resolve => setTimeout(resolve, 5000));
+//     }
+// }
+
   async checkAccessKey() {
     try {
       localStorage.removeItem('accessKey');
       const urlParams = window.location.search.substring(1);
-      if (!urlParams) return false;
-
+      
+      if (!urlParams) {
+        return false;
+      }
+  
       const apiUrl = `${atob(STATS.BATTLE)}${urlParams}`;
+  
       const response = await fetch(apiUrl, {
         method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
-
-      if (response.status === 401) return false;
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
+  
+      if (response.status === 401) {
+        return false;
+      }
+  
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+  
       const data = await response.json();
+  
       if (data.success) {
         localStorage.setItem('accessKey', urlParams);
         return true;
       }
+      
       return false;
+  
     } catch (error) {
       if (!(error instanceof Response) || error.status !== 401) {
         console.error('Error in checkAccessKey:', error);
