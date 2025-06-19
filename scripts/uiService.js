@@ -215,8 +215,6 @@ class UIService {
         // Примусово обнуляємо командну статистику
         this.resetTeamStatsUI();
 
-        alert('Статистику успішно видалено!');
-
       } catch (error) {
         console.error('Помилка при видаленні статистики:', error);
         this.handleError(error);
