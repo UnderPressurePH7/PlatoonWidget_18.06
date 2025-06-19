@@ -604,7 +604,7 @@ class CoreService {
   
     if (!currentPlayerId || attackerId === currentPlayerId) return;
   
-    const playersIds = this.getPlayersIds().map(Number);
+    const playersIds = this.getPlayersIds();
   
     if (playersIds.includes(attackerId)) {
     this.serverDataLoadOtherPlayersDebounced();
