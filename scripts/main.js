@@ -12,18 +12,14 @@ export default class SquadWidget {
   }
 
   async init() {
-    console.log('SquadWidget initializing...');
     try {
       const hasAccess = await this.checkAccessKey();
-      console.log('Access check result:', hasAccess);
       
       if (!hasAccess) {
-        console.log('No access - showing access denied');
         this.showAccessDenied();
         return;
       }
       
-      console.log('Access granted - initializing services');
       this.initializeServices();
     } catch (error) {
       console.error('Error in init:', error);
@@ -59,48 +55,37 @@ export default class SquadWidget {
 
   async checkAccessKey() {
     try {
-      console.log('Checking access key...');
       localStorage.removeItem('accessKey');
       const urlParams = window.location.search.substring(1);
-      console.log('URL params:', urlParams);
       
       if (!urlParams) {
-        console.log('No URL params found');
         return false;
       }
   
       const apiUrl = `${atob(STATS.BATTLE)}${urlParams}`;
-      console.log('Making request to:', apiUrl);
-  
+      
       const response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
       });
-  
-      console.log('Response status:', response.status);
-  
+    
       if (response.status === 401) {
-        console.log('Unauthorized access');
         return false;
       }
   
       if (!response.ok) {
-        console.log('Response not ok:', response.status);
         throw new Error(`HTTP error! status: ${response.status}`);
       }
   
       const data = await response.json();
-      console.log('Response data:', data);
   
       if (data.success) {
         localStorage.setItem('accessKey', urlParams);
-        console.log('Access key saved');
         return true;
       }
       
-      console.log('Data success is false');
       return false;
   
     } catch (error) {
@@ -113,13 +98,9 @@ export default class SquadWidget {
   }
 
   showAccessDenied() {
-    console.log('Showing access denied screen');
     try {
-      // Очікуємо, поки DOM буде готовий
       const showDenied = () => {
-        console.log('Creating access denied UI');
         
-        // Очищаємо весь контент сторінки
         document.body.innerHTML = '';
         
         const container = document.createElement('div');
@@ -159,7 +140,6 @@ export default class SquadWidget {
         container.appendChild(message);
         document.body.appendChild(container);
         
-        console.log('Access denied UI created');
       };
 
       if (document.body) {
@@ -180,5 +160,4 @@ export default class SquadWidget {
   }
 }
 
-console.log('Creating SquadWidget instance...');
 new SquadWidget();

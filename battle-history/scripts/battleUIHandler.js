@@ -252,8 +252,6 @@ class BattleUIHandler {
             this.worstBattleId = worstBattle.id;
             this.bestBattleId = bestBattle.id;
             
-            console.log('Знайдено найгірший бій:', this.worstBattleId, 'з очками:', worstBattlePoints);
-            console.log('Знайдено найкращий бій:', this.bestBattleId, 'з очками:', bestBattlePoints);
         } catch (error) {
             console.error('Помилка при пошуку найгіршого/найкращого бою:', error);
             this.worstBattleId = null;
@@ -312,11 +310,8 @@ class BattleUIHandler {
             date: document.getElementById('date-filter')?.value || '',
             player: document.getElementById('player-filter')?.value || ''
         };
-
-        console.log('Застосовані фільтри:', filters);
         
         const filteredBattles = await this.dataManager.applyFilters(filters);
-        console.log('Відфільтровані бої:', filteredBattles);
         
         // Скидаємо пагінацію на першу сторінку
         this.currentPage = 1;
