@@ -102,6 +102,14 @@ class UIService {
     this.updateElement('team-points', teamStats.teamPoints.toLocaleString());
   }
 
+  resetTeamStatsUI() {
+    this.updateElement('best-battle', '0');
+    this.updateElement('worst-battle', '0');
+    this.updateElement('battles-count', '0/0');
+    this.updateElement('team-now-points', '0');
+    this.updateElement('team-points', '0');
+  }
+
   updateElement(id, value) {
     const element = document.getElementById(id);
     if (element) {
@@ -187,9 +195,6 @@ class UIService {
       if (!confirm('Видалити поточну статистику історії боїв?')) {
         return;
       }
-      if (!confirm('Ви впевнені? Це незворотна дія!')) {
-        return;
-      }
 
       try {
         isDeleting = true;
@@ -205,6 +210,10 @@ class UIService {
         await this.core.clearServerData();
         this.core.clearState();
         this.updatePlayersUI();
+        
+        localStorage.clear();
+        // Примусово обнуляємо командну статистику
+        this.resetTeamStatsUI();
 
         alert('Статистику успішно видалено!');
 
