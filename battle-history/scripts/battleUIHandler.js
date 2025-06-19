@@ -750,9 +750,7 @@ class BattleUIHandler {
         if (!tableBody) return;
         
         tableBody.innerHTML = '';
-х
         const vehicleStats = {};
-        
         const battles = this.dataManager.getBattlesArray();
         
         battles.forEach(battle => {
