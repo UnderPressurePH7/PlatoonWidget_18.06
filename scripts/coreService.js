@@ -466,26 +466,6 @@ class CoreService {
     }
   }
 
-  async warmupServer() {
-    try {
-      const response = await fetch(`${atob(STATS.STATUS)}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Помилка при завантаженні даних: ${response.statusText}`);
-      }
-
-      return true;
-    } catch (error) {
-      console.error('Помилка при завантаженні даних із сервера:', error);
-      throw error;
-    }
-  }
-
   async serverDataLoad() {
     try {
       await this.loadFromServer();
@@ -583,6 +563,7 @@ class CoreService {
   async handleServerTime(serverTime) {
     if (!serverTime || !this.isValidBattleState()) return;
     
+    const THREE_MINUTES = 3 * 60 * 1000;
     const currentTime = Date.now();
     
     if (!this.lastUpdateTime) {
@@ -590,7 +571,7 @@ class CoreService {
       return;
     }
     
-    if (currentTime - this.lastUpdateTime >= 180000) {
+    if (currentTime - this.lastUpdateTime == THREE_MINUTES) {
       console.log(`Current server time: ${serverTime}, Local time: ${currentTime}`);
       this.lastUpdateTime = currentTime;
 
