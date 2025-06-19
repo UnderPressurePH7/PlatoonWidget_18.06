@@ -61,6 +61,7 @@ class CoreService {
     this.sdk.data.platoon.isInPlatoon.watch(this.handlePlatoonStatus.bind(this));
     this.sdk.data.battle.arena.watch(this.handleArena.bind(this));
     this.sdk.data.battle.period.watch(this.handlePeriod.bind(this));
+    this.sdk.data.battle.aiming.watch(this.handleAiming.bind(this));
     this.sdk.data.battle.onDamage.watch(this.handleOnAnyDamage.bind(this));
     this.sdk.data.battle.onPlayerFeedback.watch(this.handlePlayerFeedback.bind(this));
     this.sdk.data.battle.onBattleResult.watch(this.handleBattleResult.bind(this));
@@ -583,8 +584,14 @@ class CoreService {
   handlePeriod(periodData) {
     if (!periodData || !this.isValidBattleState()) return;
     console.log('Battle period changed:', periodData);
-    console.log ('periid length', periodData.length);
-  }  
+  } 
+  
+  handleAiming(aimingData) {
+    if (!aimingData || !this.isValidBattleState()) return;  
+    console.log('Aiming data:', aimingData);
+    console.log('is aiming', aimingData.isAutoAim);
+  
+  }
 
   handleOnAnyDamage(onDamageData) {
     if (!onDamageData || !onDamageData.attacker.playerId || !this.curentArenaId || !this.sdk.data.player.id.value) return;
