@@ -1,33 +1,31 @@
-import EventEmitter from './eventEmitter.js';
-import { GAME_POINTS, STATS } from './constants.js';
+import EventEmitter from './utils/eventEmitter.js';
+import { StateManager } from './utils/stateManager.js';
+import { GAME_POINTS, STATS } from '../utils/constants.js';
 
 class BattleDataManager {
   constructor() {
-
-
-    const savedState = localStorage.getItem('gameState');
-    if (savedState) {
-      const state = JSON.parse(savedState);
-      this.BattleStats = state.BattleStats || {};
-      this.PlayersInfo = state.PlayersInfo || {};
-    }
-
+    this.initializeState();
     this.filteredBattles = [];
     this.eventsHistory = new EventEmitter();
   }
 
-  saveState() {
-    const state = {
-      BattleStats: this.BattleStats
-    };
+  initializeState() {
+    const savedState = StateManager.loadState();
+    this.BattleStats = savedState?.BattleStats || {};
+    this.PlayersInfo = savedState?.PlayersInfo || {};
+  }
 
-    localStorage.setItem('gameState', JSON.stringify(state));
+  saveState() {
+    StateManager.saveState({
+      BattleStats: this.BattleStats,
+      PlayersInfo: this.PlayersInfo
+    });
   }
 
   clearState() {
-    localStorage.removeItem('gameState');
-
+    StateManager.clearState();
     this.BattleStats = {};
+    this.PlayersInfo = {};
   }
 
   sleep(ms) {
@@ -35,7 +33,7 @@ class BattleDataManager {
   }
 
   getAccessKey() {
-    return localStorage.getItem('accessKey');
+    return StateManager.getAccessKey();
   }
 
   getBattlesArray() {
@@ -46,15 +44,13 @@ class BattleDataManager {
   }
 
   calculateBattleData(battle) {
-    let battlePoints = 0;
+    if (!battle) return { battlePoints: 0, battleDamage: 0, battleKills: 0 };
+
+    let battlePoints = battle.win === 1 ? GAME_POINTS.POINTS_PER_TEAM_WIN : 0;
     let battleDamage = 0;
     let battleKills = 0;
-    
-    if (battle.win === 1) {
-      battlePoints += GAME_POINTS.POINTS_PER_TEAM_WIN;
-    }
 
-    if (battle && battle.players) {
+    if (battle.players) {
       Object.values(battle.players).forEach(player => {
         battlePoints += player.points || 0;
         battleDamage += player.damage || 0;
@@ -70,12 +66,15 @@ class BattleDataManager {
     let playerDamage = 0;
     let playerKills = 0;
 
-    for (const arenaId in this.BattleStats) {
-      const player = this.BattleStats[arenaId].players[playerId];
-      playerPoints += player.points;
-      playerDamage += player.damage;
-      playerKills += player.kills;
-    }
+    Object.values(this.BattleStats).forEach(battle => {
+      const player = battle.players?.[playerId];
+      if (player) {
+        playerPoints += player.points || 0;
+        playerDamage += player.damage || 0;
+        playerKills += player.kills || 0;
+      }
+    });
+
     return { playerPoints, playerDamage, playerKills };
   }
 
@@ -84,49 +83,61 @@ class BattleDataManager {
     let teamDamage = 0;
     let teamKills = 0;
     let wins = 0;
-    let battles = 0;
+    const battles = Object.keys(this.BattleStats).length;
 
+    Object.values(this.BattleStats).forEach(battle => {
+      if (battle.win === 1) {
+        teamPoints += GAME_POINTS.POINTS_PER_TEAM_WIN;
+        wins++;
+      }
 
-    for (const arenaId in this.BattleStats) {
-      battles++;
-      if (this.BattleStats[arenaId].win === 1) { 
-        teamPoints += GAME_POINTS.POINTS_PER_TEAM_WIN; wins++; 
+      if (battle.players) {
+        Object.values(battle.players).forEach(player => {
+          teamPoints += player.points || 0;
+          teamDamage += player.damage || 0;
+          teamKills += player.kills || 0;
+        });
       }
-      for (const playerId in this.BattleStats[arenaId].players) {
-        const player = this.BattleStats[arenaId].players[playerId];
-        teamPoints += player.points;
-        teamDamage += player.damage;
-        teamKills += player.kills;
-      }
-    }
+    });
+
     return { teamPoints, teamDamage, teamKills, wins, battles };
   }
 
-  async saveToServer() {
+  async makeServerRequest(url, options = {}) {
+    const response = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+      },
+      ...options
+    });
 
+    if (!response.ok) {
+      throw new Error(`Server error: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async saveToServer() {
     try {
       const accessKey = this.getAccessKey();
-      const response = await fetch(`${atob(STATS.BATTLE)}import/${accessKey}`, {
+      if (!accessKey) {
+        throw new Error('Access key not found');
+      }
+
+      const data = await this.makeServerRequest(`${atob(STATS.BATTLE)}import/${accessKey}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          BattleStats: this.BattleStats
-        }),
+        body: JSON.stringify({ BattleStats: this.BattleStats })
       });
 
-      if (!response.ok) {
-        throw new Error(`Помилка при збереженні даних: ${response.statusText}`);
+      if (!data.success) {
+        throw new Error(data.message || 'Failed to save data');
       }
 
-      const data = await response.json();
-      if (!data.success) {
-        throw new Error(data.message || 'Помилка при збереженні даних');
-      }
       return true;
     } catch (error) {
-      console.error('Помилка при збереженні даних на сервер:', error);
+      console.error('Error saving data to server:', error);
       throw error;
     }
   }
@@ -137,130 +148,109 @@ class BattleDataManager {
       if (!accessKey) {
         throw new Error('Access key not found');
       }
-      const response = await fetch(`${atob(STATS.BATTLE)}${accessKey}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
 
-      if (!response.ok) {
-        throw new Error(`Помилка при завантаженні даних: ${response.statusText}`);
-      }
-
-      const data = await response.json();
+      const data = await this.makeServerRequest(`${atob(STATS.BATTLE)}${accessKey}`);
 
       if (data.success) {
-        if (data.BattleStats) {
-          this.BattleStats = data.BattleStats;
-        }
-        if (data.PlayerInfo) {
-          this.PlayersInfo = data.PlayerInfo;
-        }
+        if (data.BattleStats) this.BattleStats = data.BattleStats;
+        if (data.PlayerInfo) this.PlayersInfo = data.PlayerInfo;
       }
+
       return true;
     } catch (error) {
-      console.error('Помилка при завантаженні даних із сервера:', error);
+      console.error('Error loading data from server:', error);
       throw error;
     }
   }
 
-
   async deleteBattle(battleId) {
-
     try {
       const accessKey = this.getAccessKey();
-      const response = await fetch(`${atob(STATS.BATTLE)}${accessKey}\\${battleId}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        }
+      if (!accessKey) {
+        throw new Error('Access key not found');
+      }
+
+      await this.makeServerRequest(`${atob(STATS.BATTLE)}${accessKey}\\${battleId}`, {
+        method: 'DELETE'
       });
 
-      if (!response.ok) {
-        throw new Error(`Помилка при очищенні даних: ${response.statusText}`);
-      }
-      // Видаляємо бій з локальних даних
+      // Remove battle from local data
       if (this.BattleStats[battleId]) {
         delete this.BattleStats[battleId];
-        this.saveState(); // Зберігаємо зміни в локальному сховищі
+        this.saveState();
       }
-      const data = await response.json();
+
       this.eventsHistory.emit('battleDeleted', battleId);
       return true;
     } catch (error) {
-      console.error('Помилка при очищенні даних на сервері:', error);
+      console.error('Error deleting battle:', error);
+      return false;
     }
-    return false;
+  }
+
+  filterByMap(battles, map) {
+    return battles.filter(battle => battle.mapName === map);
+  }
+
+  filterByVehicle(battles, vehicle) {
+    return battles.filter(battle => 
+      battle.players && Object.values(battle.players).some(player => 
+        player.vehicle === vehicle
+      )
+    );
+  }
+
+  filterByResult(battles, result) {
+    const resultMap = {
+      victory: 1,
+      defeat: 0,
+      draw: 2,
+      inBattle: -1
+    };
+
+    return battles.filter(battle => battle.win === resultMap[result]);
+  }
+
+  filterByDate(battles, date) {
+    const filterDate = new Date(date);
+    filterDate.setHours(0, 0, 0, 0);
+
+    return battles.filter(battle => {
+      if (!battle.startTime) return false;
+
+      const battleDate = new Date(battle.startTime);
+      battleDate.setHours(0, 0, 0, 0);
+
+      return battleDate.getTime() === filterDate.getTime();
+    });
+  }
+
+  filterByPlayer(battles, player) {
+    return battles.filter(battle =>
+      battle.players && Object.values(battle.players).some(p => 
+        p.name === player
+      )
+    );
   }
 
   async applyFilters(filters) {
-    // Отримуємо всі бої
     let filteredBattles = this.getBattlesArray();
 
-    // Фільтруємо за мапою
-    if (filters.map) {
-      filteredBattles = filteredBattles.filter(battle =>
-        battle.mapName === filters.map
-      );
-    }
+    const filterMethods = {
+      map: this.filterByMap,
+      vehicle: this.filterByVehicle,
+      result: this.filterByResult,
+      date: this.filterByDate,
+      player: this.filterByPlayer
+    };
 
-    // Фільтруємо за танком
-    if (filters.vehicle) {
-      filteredBattles = filteredBattles.filter(battle => {
-        if (!battle.players) return false;
-        return Object.values(battle.players).some(player =>
-          player.vehicle === filters.vehicle
-        );
-      });
-    }
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value && filterMethods[key]) {
+        filteredBattles = filterMethods[key].call(this, filteredBattles, value);
+      }
+    });
 
-    // Фільтруємо за результатом
-    if (filters.result) {
-      filteredBattles = filteredBattles.filter(battle => {
-        if (filters.result === 'victory') {
-          return battle.win === 1;
-        } else if (filters.result === 'defeat') {
-          return battle.win === 0;
-        } else if (filters.result === 'draw') {
-          return battle.win === 2;
-        } else if (filters.result === 'inBattle') {
-          return battle.win === -1;
-        }
-        return true;
-      });
-    }
-
-    // Фільтруємо за датою
-    if (filters.date) {
-      const filterDate = new Date(filters.date);
-      filterDate.setHours(0, 0, 0, 0);
-
-      filteredBattles = filteredBattles.filter(battle => {
-        if (!battle.startTime) return false;
-
-        const battleDate = new Date(battle.startTime);
-        battleDate.setHours(0, 0, 0, 0);
-
-        return battleDate.getTime() === filterDate.getTime();
-      });
-    }
-
-    // Фільтруємо за гравцем
-    if (filters.player) {
-      filteredBattles = filteredBattles.filter(battle => {
-        if (!battle.players) return false;
-
-        return Object.values(battle.players).some(player =>
-          player.name === filters.player
-        );
-      });
-    }
-
-    // Зберігаємо відфільтровані бої
     this.filteredBattles = filteredBattles;
-
-    // Сповіщаємо про застосування фільтрів
     this.eventsHistory.emit('filtersApplied', this.filteredBattles);
 
     return this.filteredBattles;
@@ -269,69 +259,76 @@ class BattleDataManager {
   async exportData() {
     try {
       return JSON.stringify(this.BattleStats, null, 2);
-    } catch (e) {
-      console.error("Помилка при експортуванні даних:", e);
+    } catch (error) {
+      console.error("Error exporting data:", error);
       return null;
     }
   }
 
-
   async importData(importedData) {
     try {
-      if (!importedData || typeof importedData !== 'object') {
-        console.error("Неправильний формат даних для імпорту");
+      if (!this.isValidImportData(importedData)) {
+        console.error("Invalid data format for import");
         return false;
       }
 
       await this.loadFromServer();
 
-      for (const [arenaId, battleData] of Object.entries(importedData)) {
-        if (!battleData || typeof battleData !== 'object') continue;
-
-        if (!this.validateBattleData(battleData)) continue;
-
-        if (this.BattleStats[arenaId]) {
-          this.BattleStats[arenaId] = {
-            ...this.BattleStats[arenaId],
-            ...battleData,
-            players: {
-              ...this.BattleStats[arenaId].players,
-              ...battleData.players
-            }
-          };
-        } else {
-          this.BattleStats[arenaId] = battleData;
-        }
-      }
+      this.mergeImportedData(importedData);
 
       const saveSuccess = await this.saveToServer();
       if (!saveSuccess) {
         throw new Error('Failed to save data to server');
       }
 
-      this.clearState();
-      this.sleep(10);
-      await this.loadFromServer();
-      this.sleep(10);
-      this.saveState();
-
+      await this.refreshLocalData();
       this.eventsHistory.emit('dataImported', importedData);
-      return true;
 
-    } catch (e) {
-      console.error("Помилка при імпорті даних:", e);
+      return true;
+    } catch (error) {
+      console.error("Error importing data:", error);
       return false;
     }
+  }
+
+  isValidImportData(data) {
+    return data && typeof data === 'object';
+  }
+
+  mergeImportedData(importedData) {
+    Object.entries(importedData).forEach(([arenaId, battleData]) => {
+      if (!battleData || typeof battleData !== 'object') return;
+      if (!this.validateBattleData(battleData)) return;
+
+      if (this.BattleStats[arenaId]) {
+        this.BattleStats[arenaId] = {
+          ...this.BattleStats[arenaId],
+          ...battleData,
+          players: {
+            ...this.BattleStats[arenaId].players,
+            ...battleData.players
+          }
+        };
+      } else {
+        this.BattleStats[arenaId] = battleData;
+      }
+    });
+  }
+
+  async refreshLocalData() {
+    this.clearState();
+    await this.sleep(10);
+    await this.loadFromServer();
+    await this.sleep(10);
+    this.saveState();
   }
 
   validateBattleData(battleData) {
     const requiredFields = ['startTime', 'duration', 'win', 'mapName', 'players'];
 
-    for (const field of requiredFields) {
-      if (!(field in battleData)) {
-        console.error(`Missing required field: ${field}`);
-        return false;
-      }
+    if (!requiredFields.every(field => field in battleData)) {
+      console.error('Missing required battle fields');
+      return false;
     }
 
     if (typeof battleData.players !== 'object') {
@@ -339,36 +336,38 @@ class BattleDataManager {
       return false;
     }
 
-    for (const [playerId, playerData] of Object.entries(battleData.players)) {
+    return Object.entries(battleData.players).every(([playerId, playerData]) => {
       if (!this.validatePlayerData(playerData)) {
         console.error(`Invalid player data for ID: ${playerId}`);
         return false;
       }
-    }
-
-    return true;
+      return true;
+    });
   }
 
   validatePlayerData(playerData) {
-    const requiredPlayerFields = ['name', 'damage', 'kills', 'points', 'vehicle'];
+    const requiredFields = ['name', 'damage', 'kills', 'points', 'vehicle'];
+    const fieldTypes = {
+      name: 'string',
+      damage: 'number',
+      kills: 'number',
+      points: 'number',
+      vehicle: 'string'
+    };
 
-    for (const field of requiredPlayerFields) {
+    return requiredFields.every(field => {
       if (!(field in playerData)) {
         console.error(`Missing required player field: ${field}`);
         return false;
       }
-    }
 
-    if (typeof playerData.name !== 'string' ||
-      typeof playerData.damage !== 'number' ||
-      typeof playerData.kills !== 'number' ||
-      typeof playerData.points !== 'number' ||
-      typeof playerData.vehicle !== 'string') {
-      console.error('Invalid player data types');
-      return false;
-    }
+      if (typeof playerData[field] !== fieldTypes[field]) {
+        console.error(`Invalid type for player field ${field}`);
+        return false;
+      }
 
-    return true;
+      return true;
+    });
   }
 }
 
