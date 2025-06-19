@@ -574,8 +574,9 @@ class CoreService {
   handlePeriod(period) {
     if (!period || !this.isValidBattleState()) return;
 
-    console.log(`Battle period changed: ${period.value}`);
+    console.log('Battle period changed:',  period.value);
     console.log('length periodData:', period.length);
+
   }
 
   async handleServerTime(serverTime) {
