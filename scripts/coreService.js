@@ -597,15 +597,17 @@ class CoreService {
   }
 
   handleOnAnyDamage(onDamageData) {
-    if (!onDamageData || !onDamageData.attacker.playerId || !this.curentArenaId || !this.sdk.data.player.id.value) return;
-
-    const playersID = this.getPlayersIds();
-
-    for (const playerId of playersID) {
-      if (onDamageData.attacker.playerId === parseInt(playerId) && parseInt(playerId) !== this.sdk.data.player.id.value) {
-        this.serverDataLoadOtherPlayersDebounced();
-        break;
-      }
+    if (!onDamageData?.attacker?.playerId || !this.curentArenaId) return;
+  
+    const attackerId = Number(onDamageData.attacker.playerId);
+    const currentPlayerId = Number(this.sdk.data.player.id.value);
+  
+    if (!currentPlayerId || attackerId === currentPlayerId) return;
+  
+    const playersIds = this.getPlayersIds().map(Number);
+  
+    if (playersIds.includes(attackerId)) {
+    this.serverDataLoadOtherPlayersDebounced();
     }
   }
 
