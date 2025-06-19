@@ -580,7 +580,7 @@ class CoreService {
   async handleServerTime(serverTime) {
     if (!serverTime || !this.isValidBattleState()) return;
     
-    const THREE_MINUTES = 3 * 60 * 1000;
+    const TWO_MINUTES = 2 * 60 * 1000;
     const currentTime = Date.now();
     
     if (!this.lastUpdateTime) {
@@ -588,7 +588,7 @@ class CoreService {
       return;
     }
     
-    if (currentTime - this.lastUpdateTime >= THREE_MINUTES && this.isInBattle) {
+    if (currentTime - this.lastUpdateTime >= TWO_MINUTES && this.isInBattle) {
       console.log(`Current server time: ${serverTime}, Local time: ${currentTime}`);
       this.lastUpdateTime = currentTime;
 
