@@ -592,7 +592,7 @@ class CoreService {
     }
     
     if (currentTime - this.lastUpdateTime >= 180000) {
-      // console.log(`Current server time: ${serverTime}, Local time: ${currentTime}`);
+      console.log(`Current server time: ${serverTime}, Local time: ${currentTime}`);
       this.lastUpdateTime = currentTime;
 
     await Utils.getRandomDelay();
