@@ -174,7 +174,6 @@ class BattleDataManager {
         method: 'DELETE'
       });
 
-      // Remove battle from local data
       if (this.BattleStats[battleId]) {
         delete this.BattleStats[battleId];
         this.saveState();

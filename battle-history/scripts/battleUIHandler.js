@@ -5,16 +5,13 @@ class BattleUIHandler {
     constructor() {
         this.dataManager = new BattleDataManager();
         this.chartManager = new ChartManager(this.dataManager);
-        
-        // Змінні для найкращого і найгіршого бою
+
         this.worstBattleId = null;
         this.bestBattleId = null;
-        
-        // Змінні для пагінації
+
         this.itemsPerPage = 10;
         this.currentPage = 1;
         
-        // Відображення колонок таблиці
         this.visibleColumns = {
             date: true,
             map: true,
@@ -31,7 +28,6 @@ class BattleUIHandler {
         this.setupTabSystem();
         this.initializeUI();
 
-        // Підписка на події від менеджера даних
         this.dataManager.eventsHistory.on('statsUpdated', () => {
             this.updateStats();
             this.findBestAndWorstBattle();
@@ -43,7 +39,7 @@ class BattleUIHandler {
         });
         
         this.dataManager.eventsHistory.on('battleDeleted', (battleId) => {
-            // Перевіряємо, чи видалений бій був найгіршим або найкращим
+
             if (battleId === this.worstBattleId) {
                 this.worstBattleId = null;
             }
@@ -82,16 +78,14 @@ class BattleUIHandler {
             this.updatePlayersTab();
             this.updateVehiclesTab();
             
-            // Ініціалізуємо діаграми
             this.chartManager.initializeCharts();
         } catch (error) {
-            console.error('Помилка при ініціалізації UI:', error);
-            this.showNotification('Помилка при завантаженні даних', 'error');
+            console.error('Error during UI initialization:', error);
+            this.showNotification('Error loading data', 'error');
         }
     }
 
     setupTabSystem() {
-        // Система вкладок головного інтерфейсу
         const tabButtons = document.querySelectorAll('.tab-btn');
         const tabContents = document.querySelectorAll('.tab-content');
         
@@ -99,15 +93,12 @@ class BattleUIHandler {
             button.addEventListener('click', () => {
                 const tabName = button.getAttribute('data-tab');
                 
-                // Приховуємо всі вкладки і знімаємо активний стан з кнопок
                 tabContents.forEach(content => content.classList.remove('active'));
                 tabButtons.forEach(btn => btn.classList.remove('active'));
-                
-                // Активуємо відповідну вкладку і кнопку
+
                 document.getElementById(`${tabName}-tab`).classList.add('active');
                 button.classList.add('active');
-                
-                // Оновлюємо дані на вкладці при переході
+
                 if (tabName === 'summary') {
                     this.chartManager.updatePerformanceCharts();
                 } else if (tabName === 'players') {
@@ -117,8 +108,7 @@ class BattleUIHandler {
                 }
             });
         });
-        
-        // Система вкладок в модальному вікні
+
         const modalTabButtons = document.querySelectorAll('.modal-tab-btn');
         const modalTabContents = document.querySelectorAll('.modal-tab-content');
         
@@ -136,18 +126,14 @@ class BattleUIHandler {
     }
 
     setupEventListeners() {
-        // Фільтри
         document.getElementById('apply-filters')?.addEventListener('click', () => this.applyFilters());
         document.getElementById('clear-filters')?.addEventListener('click', () => this.clearFilters());
 
-        // Імпорт/Експорт
         document.getElementById('export-data')?.addEventListener('click', () => this.exportData());
         document.getElementById('import-data')?.addEventListener('click', () => this.importData());
 
-        // Модальне вікно
         document.getElementById('close-modal')?.addEventListener('click', () => this.closeModal());
-        
-        // Закриття модального вікна при кліку поза ним
+
         window.addEventListener('click', (e) => {
             const modal = document.getElementById('battle-modal');
             if (e.target === modal) {
@@ -155,14 +141,12 @@ class BattleUIHandler {
             }
         });
         
-        // Закриття модального вікна по клавіші Escape
         window.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 this.closeModal();
             }
         });
-        
-        // Налаштування колонок таблиці
+
         const toggleColumnsBtn = document.getElementById('toggle-columns');
         const columnDropdown = document.getElementById('column-dropdown');
         
@@ -171,15 +155,13 @@ class BattleUIHandler {
                 e.stopPropagation();
                 columnDropdown.classList.toggle('show');
             });
-            
-            // Клік поза випадаючим списком закриває його
+
             document.addEventListener('click', (e) => {
                 if (!columnDropdown.contains(e.target) && e.target !== toggleColumnsBtn) {
                     columnDropdown.classList.remove('show');
                 }
             });
-            
-            // Зміна видимості колонок
+
             const columnCheckboxes = columnDropdown.querySelectorAll('input[type="checkbox"]');
             columnCheckboxes.forEach(checkbox => {
                 checkbox.addEventListener('change', () => {
@@ -192,7 +174,6 @@ class BattleUIHandler {
     }
 
     updateColumnVisibility() {
-        // Оновлюємо видимість колонок в таблиці
         Object.entries(this.visibleColumns).forEach(([column, isVisible]) => {
             const columnElements = document.querySelectorAll(`.col-${column}`);
             columnElements.forEach(el => {
@@ -201,7 +182,6 @@ class BattleUIHandler {
         });
     }
 
-    // Метод для пошуку найкращого і найгіршого бою
     findBestAndWorstBattle(battles = null) {
         const allBattles = battles || this.dataManager.getBattlesArray();
         
@@ -211,7 +191,6 @@ class BattleUIHandler {
             return;
         }
 
-        // Фільтруємо тільки завершені бої (не "в бою")
         const completedBattles = allBattles.filter(battle => battle.win !== -1);
         
         if (completedBattles.length === 0) {
@@ -221,7 +200,6 @@ class BattleUIHandler {
         }
 
         try {
-            // Знаходимо найгірший бій (з найменшою кількістю загальних очок)
             let worstBattle = completedBattles[0];
             let bestBattle = completedBattles[0];
             let worstBattlePoints = this.dataManager.calculateBattleData(worstBattle).battlePoints;
@@ -231,29 +209,24 @@ class BattleUIHandler {
                 try {
                     const battleData = this.dataManager.calculateBattleData(battle);
                     const battlePoints = battleData.battlePoints;
-                    
-                    // Перевіряємо, чи очки менші за поточного найгіршого бою
+
                     if (battlePoints < worstBattlePoints) {
                         worstBattle = battle;
                         worstBattlePoints = battlePoints;
                     }
-                    
-                    // Перевіряємо, чи очки більші за поточного найкращого бою
                     if (battlePoints > bestBattlePoints) {
                         bestBattle = battle;
                         bestBattlePoints = battlePoints;
                     }
                 } catch (error) {
-                    console.error('Помилка при обчисленні даних бою:', error, battle);
+                    console.error('Error in calculating battle data:', error, battle);
                 }
             });
-
-            // Зберігаємо ID найгіршого та найкращого бою
             this.worstBattleId = worstBattle.id;
             this.bestBattleId = bestBattle.id;
             
         } catch (error) {
-            console.error('Помилка при пошуку найгіршого/найкращого бою:', error);
+            console.error('Error when searching for the worst/best battle:', error);
             this.worstBattleId = null;
             this.bestBattleId = null;
         }
@@ -312,11 +285,8 @@ class BattleUIHandler {
         };
         
         const filteredBattles = await this.dataManager.applyFilters(filters);
-        
-        // Скидаємо пагінацію на першу сторінку
+
         this.currentPage = 1;
-        
-        // Оновлюємо найкращий і найгірший бій для відфільтрованих результатів
         this.findBestAndWorstBattle(filteredBattles);
     }
 
@@ -335,8 +305,6 @@ class BattleUIHandler {
         if (!tableBody) return;
 
         tableBody.innerHTML = '';
-        
-        // Використовуємо відфільтровані бої, якщо вони передані, інакше показуємо всі бої
         const allBattles = filteredBattles || this.dataManager.getBattlesArray();
         
         if (!allBattles || allBattles.length === 0) {
@@ -345,12 +313,9 @@ class BattleUIHandler {
             return;
         }
 
-        // Сортуємо бої за датою (від найновіших до найстаріших)
         const sortedBattles = [...allBattles].sort((a, b) => 
             new Date(b.startTime || 0) - new Date(a.startTime || 0)
         );
-        
-        // Реалізуємо пагінацію
         const totalPages = Math.ceil(sortedBattles.length / this.itemsPerPage);
         const startIndex = (this.currentPage - 1) * this.itemsPerPage;
         const endIndex = startIndex + this.itemsPerPage;
@@ -364,7 +329,7 @@ class BattleUIHandler {
                     tableBody.appendChild(row);
                 }
             } catch (error) {
-                console.error('Помилка при створенні рядка бою:', error, battle);
+                console.error('Error creating a battle line:', error, battle);
             }
         });
         
@@ -379,8 +344,7 @@ class BattleUIHandler {
         paginationContainer.innerHTML = '';
         
         if (totalPages <= 1) return;
-        
-        // Кнопка "Попередня сторінка"
+  
         if (this.currentPage > 1) {
             const prevButton = document.createElement('button');
             prevButton.innerHTML = '&laquo;';
@@ -390,8 +354,7 @@ class BattleUIHandler {
             });
             paginationContainer.appendChild(prevButton);
         }
-        
-        // Кнопки сторінок
+
         let startPage = Math.max(1, this.currentPage - 2);
         let endPage = Math.min(totalPages, startPage + 4);
         
@@ -413,8 +376,7 @@ class BattleUIHandler {
             
             paginationContainer.appendChild(pageButton);
         }
-        
-        // Кнопка "Наступна сторінка"
+
         if (this.currentPage < totalPages) {
             const nextButton = document.createElement('button');
             nextButton.innerHTML = '&raquo;';
@@ -430,8 +392,7 @@ class BattleUIHandler {
         if (!battle || !battle.id) return null;
         
         const row = document.createElement('tr');
-        
-        // Перевіряємо, чи це найгірший або найкращий бій
+
         if (this.worstBattleId && battle.id === this.worstBattleId) {
             row.classList.add('worst-battle');
         } else if (this.bestBattleId && battle.id === this.bestBattleId) {
@@ -460,7 +421,6 @@ class BattleUIHandler {
         }
         
         try {
-            // Розрахунок загальних очок за бій
             const battleData = this.dataManager.calculateBattleData(battle);
             const totalBattlePoints = battleData.battlePoints;
 
@@ -484,13 +444,12 @@ class BattleUIHandler {
                 </td>
             `;
 
-            // Додаємо обробники подій
             row.querySelector('.view-battle')?.addEventListener('click', () => this.showBattleDetails(battle));
             row.querySelector('.delete-battle')?.addEventListener('click', () => this.deleteBattle(battle.id));
 
             return row;
         } catch (error) {
-            console.error('Помилка при обчисленні даних для рядка:', error, battle);
+            console.error('Error calculating data for a string:', error, battle);
             return null;
         }
     }
@@ -500,8 +459,7 @@ class BattleUIHandler {
         
         const modal = document.getElementById('battle-modal');
         if (!modal) return;
-        
-        // Деталі бою - заголовок
+
         const detailMap = document.getElementById('detail-map');
         const detailTime = document.getElementById('detail-time');
         const resultElement = document.getElementById('detail-result');
@@ -537,56 +495,42 @@ class BattleUIHandler {
             detailDuration.textContent = `Тривалість: ${this.formatDuration(battle.duration)}`;
         }
 
-        // Оновлення блоку зі статистикою
         this.updateBattleStatistics(battle);
-        
-        // Оновлення таблиці гравців у вкладці "Гравці"
         this.updateModalPlayersTable(battle);
-        
-        // Оновлення аналізу бою у вкладці "Аналіз"
         this.updateBattleAnalysis(battle);
         
-        // Показуємо спеціальну мітку для найгіршого бою
         const modalContent = modal.querySelector('.modal-content');
         if (modalContent) {
-            // Видаляємо попередні бейджі, якщо вони є
             const oldBadges = modal.querySelectorAll('.battle-badge');
             oldBadges.forEach(badge => badge.remove());
             
             modalContent.classList.remove('worst-battle-modal', 'best-battle-modal');
-            
-            // Перевіряємо, чи це найгірший бій
+
             if (this.worstBattleId && battle.id === this.worstBattleId) {
                 modalContent.classList.add('worst-battle-modal');
-                
-                // Додаємо мітку "Найгірший бій"
+
                 const badge = document.createElement('div');
                 badge.className = 'worst-battle-badge battle-badge';
                 badge.textContent = 'Найгірший бій';
                 modalContent.querySelector('.modal-header').appendChild(badge);
             }
-            
-            // Перевіряємо, чи це найкращий бій
+
             if (this.bestBattleId && battle.id === this.bestBattleId) {
                 modalContent.classList.add('best-battle-modal');
-                
-                // Додаємо мітку "Найкращий бій"
+
                 const badge = document.createElement('div');
                 badge.className = 'best-battle-badge battle-badge';
                 badge.textContent = 'Найкращий бій';
                 modalContent.querySelector('.modal-header').appendChild(badge);
             }
         }
-        
-        // Відображення модального вікна
+
         modal.style.display = 'block';
-        
-        // Додаємо клас для анімації появи
+
         setTimeout(() => {
             modal.querySelector('.modal-content')?.classList.add('show');
         }, 10);
-        
-        // Скидаємо активну вкладку на першу (Загальне)
+
         document.querySelectorAll('.modal-tab-btn').forEach(btn => btn.classList.remove('active'));
         document.querySelectorAll('.modal-tab-content').forEach(content => content.classList.remove('active'));
         document.querySelector('.modal-tab-btn[data-modal-tab="summary"]').classList.add('active');
@@ -598,13 +542,12 @@ class BattleUIHandler {
         
         try {
             const battleData = this.dataManager.calculateBattleData(battle);
-            
-            // Оновлюємо показники в модальному вікні
+
             document.getElementById('modal-damage').textContent = battleData.battleDamage.toLocaleString();
             document.getElementById('modal-frags').textContent = battleData.battleKills.toLocaleString();
             document.getElementById('modal-points').textContent = battleData.battlePoints.toLocaleString();
         } catch (error) {
-            console.error('Помилка при оновленні статистики бою:', error, battle);
+            console.error('Error updating battle statistics:', error, battle);
         }
     }
 
@@ -639,8 +582,7 @@ class BattleUIHandler {
         
         try {
             const battleData = this.dataManager.calculateBattleData(battle);
-            
-            // Додаємо ключові метрики
+
             const metrics = [
                 { name: 'Загальна шкода', value: battleData.battleDamage.toLocaleString(), class: 'damage' },
                 { name: 'Загальні фраги', value: battleData.battleKills.toLocaleString(), class: 'frags' },
@@ -657,18 +599,15 @@ class BattleUIHandler {
                 `;
                 keyMetricsList.appendChild(li);
             });
-            
-            // Створюємо або оновлюємо діаграму внеску гравців
             this.chartManager.updateBattleContributionChart(battle);
         } catch (error) {
-            console.error('Помилка при оновленні аналізу бою:', error, battle);
+            console.error('Error updating battle analysis:', error, battle);
         }
     }
 
     closeModal() {
         const modal = document.getElementById('battle-modal');
         if (modal) {
-            // Додаємо анімацію закриття
             const modalContent = modal.querySelector('.modal-content');
             if (modalContent) {
                 modalContent.classList.remove('show');
@@ -686,8 +625,8 @@ class BattleUIHandler {
                 await this.dataManager.deleteBattle(battleId);
                 this.showNotification('Бій успішно видалено', 'success');
             } catch (error) {
-                console.error('Помилка при видаленні бою:', error);
-                this.showNotification('Помилка при видаленні бою', 'error');
+                console.error('Error when deleting a battle:', error);
+                this.showNotification('Error when deleting a battle:', 'error');
             }
         }
     }
@@ -711,23 +650,20 @@ class BattleUIHandler {
                 const element = document.getElementById(id);
                 if (element) element.textContent = value;
             });
-            
-            // Оновлюємо діаграми статистики
+
             this.chartManager.updatePerformanceCharts();
         } catch (error) {
-            console.error('Помилка при оновленні статистики:', error);
+            console.error('Error when updating statistics:Error when deleting a battle:', error);
         }
     }
 
     updatePlayersTab() {
         try {
-            // Заповнюємо таблицю статистики гравців
             this.updatePlayersTable();
-            
-            // Оновлюємо діаграми для гравців
+
             this.chartManager.updatePlayerCharts();
         } catch (error) {
-            console.error('Помилка при оновленні вкладки гравців:', error);
+            console.error('Error updating the players tab:', error);
         }
     }
 
@@ -739,8 +675,7 @@ class BattleUIHandler {
         
         const battles = this.dataManager.getBattlesArray();
         const playerStats = new Map();
-        
-        // Збираємо статистику по гравцях
+
         battles.forEach(battle => {
             if (!battle.players) return;
             
@@ -765,8 +700,7 @@ class BattleUIHandler {
                 stats.points += player.points || 0;
             });
         });
-        
-        // Сортуємо гравців за середньою шкодою (від більшого до меншого)
+
         const sortedPlayers = Array.from(playerStats.entries())
             .map(([playerName, stats]) => ({
                 name: playerName,
@@ -796,20 +730,18 @@ class BattleUIHandler {
                 
                 tableBody.appendChild(row);
             } catch (error) {
-                console.error('Помилка при створенні рядка статистики гравця:', error, player.name);
+                console.error('Error creating a player statistics line:', error, player.name);
             }
         });
     }
 
     updateVehiclesTab() {
         try {
-            // Заповнюємо таблицю статистики техніки
             this.updateVehiclesTable();
-            
-            // Оновлюємо діаграми для техніки
+
             this.chartManager.updateVehicleCharts();
         } catch (error) {
-            console.error('Помилка при оновленні вкладки техніки:', error);
+            console.error('Error updating the equipment tab:', error);
         }
     }
 
@@ -818,8 +750,7 @@ class BattleUIHandler {
         if (!tableBody) return;
         
         tableBody.innerHTML = '';
-        
-        // Збираємо статистику по всіх танках
+х
         const vehicleStats = {};
         
         const battles = this.dataManager.getBattlesArray();
@@ -851,7 +782,6 @@ class BattleUIHandler {
             });
         });
         
-        // Сортуємо танки за середньою шкодою
         const sortedVehicles = Object.entries(vehicleStats)
             .map(([vehicleName, stats]) => ({
                 vehicle: vehicleName,
@@ -882,7 +812,7 @@ class BattleUIHandler {
                 
                 tableBody.appendChild(row);
             } catch (error) {
-                console.error('Помилка при створенні рядка статистики техніки:', error, vehicle);
+                console.error('Error when creating a vehicle statistics line:', error, vehicle);
             }
         });
     }
@@ -891,7 +821,7 @@ class BattleUIHandler {
         try {
             const data = await this.dataManager.exportData();
             if (!data) {
-                this.showNotification('Помилка при експорті даних', 'error');
+                this.showNotification('Error when exporting data', 'error');
                 return;
             }
 
@@ -905,10 +835,10 @@ class BattleUIHandler {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
             
-            this.showNotification('Дані успішно експортовано', 'success');
+            this.showNotification('Data has been successfully exported', 'success');
         } catch (error) {
-            console.error('Помилка при експорті даних:', error);
-            this.showNotification('Помилка при експорті даних', 'error');
+            console.error('Error exporting data:', error);
+            this.showNotification('Error exporting data', 'error');
         }
     }
 
@@ -928,13 +858,13 @@ class BattleUIHandler {
                     const success = await this.dataManager.importData(data);
                     
                     if (success) {
-                        this.showNotification('Дані успішно імпортовано', 'success');
+                        this.showNotification('Data has been successfully imported', 'success');
                     } else {
-                        this.showNotification('Помилка при імпорті даних', 'error');
+                        this.showNotification('Error importing data', 'error');
                     }
                 } catch (error) {
                     console.error('Error importing data:', error);
-                    this.showNotification('Помилка при читанні файлу', 'error');
+                    this.showNotification('Error reading a file', 'error');
                 }
             };
             reader.readAsText(file);
@@ -990,7 +920,6 @@ class BattleUIHandler {
         notification.className = `notification ${type}`;
         notification.textContent = message;
         
-        // Стилі для сповіщення
         Object.assign(notification.style, {
             position: 'fixed',
             bottom: '20px',
@@ -1004,7 +933,6 @@ class BattleUIHandler {
             backgroundColor: type === 'success' ? '#4CAF50' : '#f44336'
         });
 
-        // Додаємо стилі анімацій
         const styleSheet = document.createElement('style');
         styleSheet.textContent = `
             @keyframes fadeIn {

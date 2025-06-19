@@ -145,11 +145,9 @@ export default class SquadWidget {
       if (document.body) {
         showDenied();
       } else {
-        // Якщо body ще не готовий, чекаємо
         if (document.readyState === 'loading') {
           document.addEventListener('DOMContentLoaded', showDenied);
         } else {
-          // Якщо readyState не loading, але body немає, чекаємо трохи
           setTimeout(showDenied, 100);
         }
       }

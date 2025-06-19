@@ -72,7 +72,6 @@ class CoreService {
     this.sdk.data.battle.onBattleResult.watch(this.handleBattleResult.bind(this));
   }
 
-  // Utility methods
   isValidBattleState() {
     return this.curentArenaId && this.curentPlayerId;
   }
@@ -172,7 +171,7 @@ class CoreService {
             bestBattlePoints = battlePoints;
           }
         } catch (error) {
-          console.error('Помилка при обчисленні даних бою:', error, battle);
+          console.error('Error in calculating battle data:', error, battle);
         }
       });
 
@@ -181,7 +180,7 @@ class CoreService {
         worstBattle: { battle: worstBattle, points: worstBattlePoints }
       };
     } catch (error) {
-      console.error('Помилка при пошуку найгіршого/найкращого бою:', error);
+      console.error('Error when searching for the worst/best battle:', error);
       return { bestBattle: null, worstBattle: null };
     }
   }
@@ -223,7 +222,7 @@ class CoreService {
         }
       }
     } catch (error) {
-      console.error('Помилка при розрахунку бойових даних:', error);
+      console.error('An error in the calculation of combat data:', error);
     }
 
     const result = { battlePoints, battleDamage, battleKills };
@@ -252,7 +251,7 @@ class CoreService {
         }
       }
     } catch (error) {
-      console.error('Помилка при розрахунку даних гравця:', error);
+      console.error('An error in the calculation of player data:', error);
     }
 
     const result = { playerPoints, playerDamage, playerKills };
@@ -289,7 +288,7 @@ class CoreService {
         }
       }
     } catch (error) {
-      console.error('Помилка при розрахунку даних команди:', error);
+      console.error('Error in calculating command data:', error);
     }
 
     const result = { teamPoints, teamDamage, teamKills, wins, battles };
@@ -357,7 +356,7 @@ class CoreService {
       });
 
       if (!response.ok) {
-        throw new Error(`Помилка при завантаженні даних: ${response.statusText}`);
+        throw new Error(`Error loading data: ${response.statusText}`);
       }
 
       const data = await response.json();
@@ -373,7 +372,7 @@ class CoreService {
       }
       return true;
     } catch (error) {
-      console.error('Помилка при завантаженні даних із сервера:', error);
+      console.error('Error downloading data from the server:', error);
       throw error;
     }
   }
@@ -394,7 +393,7 @@ class CoreService {
       });
 
       if (!response.ok) {
-        throw new Error(`Помилка при завантаженні даних: ${response.statusText}`);
+        throw new Error(`Error loading data: ${response.statusText}`);
       }
 
       const data = await response.json();
@@ -439,7 +438,7 @@ class CoreService {
 
       return false;
     } catch (error) {
-      console.error('Помилка при завантаженні даних із сервера:', error);
+      console.error('Error downloading data from the server:', error);
       throw error;
     }
   }
@@ -455,7 +454,7 @@ class CoreService {
       });
 
       if (!response.ok) {
-        throw new Error(`Помилка при очищенні даних: ${response.statusText}`);
+        throw new Error(`Error clearing data: ${response.statusText}`);
       }
 
       const data = await response.json();
@@ -467,7 +466,7 @@ class CoreService {
       }
 
     } catch (error) {
-      console.error('Помилка при очищенні даних на сервері:', error);
+      console.error('Error clearing data on the server:', error);
       throw error;
     }
   }
@@ -516,7 +515,6 @@ class CoreService {
     }
   }
 
-  // Event handlers
   handlePlatoonStatus(isInPlatoon) {
     this.isInPlatoon = isInPlatoon;
     this.saveState();

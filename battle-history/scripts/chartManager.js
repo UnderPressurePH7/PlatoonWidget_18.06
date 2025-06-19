@@ -6,19 +6,16 @@ class ChartManager {
 
     initializeCharts() {
         try {
-            // Ініціалізація діаграм на вкладці "Загальна статистика"
             this.createPerformanceChart();
             this.createWinRateChart();
-            
-            // Ініціалізація діаграм на вкладці "Статистика гравців" (нові спрощені діаграми)
+
             this.createSimplePlayerChart();
             this.createPlayerWinRateChart();
-            
-            // Ініціалізація діаграм на вкладці "Статистика техніки" (нові спрощені діаграми)
+
             this.createSimpleVehicleChart();
             this.createVehicleWinRateChart();
         } catch (error) {
-            console.error('Помилка при ініціалізації діаграм:', error);
+            console.error('Error when initializing charts:', error);
         }
     }
 
@@ -27,7 +24,7 @@ class ChartManager {
             this.updatePerformanceChart();
             this.updateWinRateChart();
         } catch (error) {
-            console.error('Помилка при оновленні діаграм продуктивності:', error);
+            console.error('Error updating performance charts:', error);
         }
     }
 
@@ -36,7 +33,7 @@ class ChartManager {
             this.updateSimplePlayerChart();
             this.updatePlayerWinRateChart();
         } catch (error) {
-            console.error('Помилка при оновленні діаграм гравців:', error);
+            console.error('Error when updating player charts:', error);
         }
     }
 
@@ -45,16 +42,14 @@ class ChartManager {
             this.updateSimpleVehicleChart();
             this.updateVehicleWinRateChart();
         } catch (error) {
-            console.error('Помилка при оновленні діаграм техніки:', error);
+            console.error('Error updating equipment diagrams:', error);
         }
     }
 
-    // Діаграми для загальної статистики
     createPerformanceChart() {
         const ctx = document.getElementById('performance-chart')?.getContext('2d');
         if (!ctx) return;
-        
-        // Знищуємо існуючу діаграму, якщо вона є
+
         if (this.charts.performance) {
             this.charts.performance.destroy();
         }
@@ -125,13 +120,11 @@ class ChartManager {
         if (!this.charts.performance) return;
         
         const battles = this.dataManager.getBattlesArray();
-        
-        // Сортуємо бої за датою
+
         const sortedBattles = [...battles].sort((a, b) => 
             new Date(a.startTime || 0) - new Date(b.startTime || 0)
         );
-        
-        // Групуємо бої по датах (без часу)
+
         const battlesByDate = {};
         sortedBattles.forEach(battle => {
             if (!battle.startTime) return;
@@ -172,8 +165,7 @@ class ChartManager {
     createWinRateChart() {
         const ctx = document.getElementById('win-rate-chart')?.getContext('2d');
         if (!ctx) return;
-        
-        // Знищуємо існуючу діаграму, якщо вона є
+
         if (this.charts.winRate) {
             this.charts.winRate.destroy();
         }
@@ -236,7 +228,6 @@ class ChartManager {
         this.charts.winRate.update();
     }
 
-    // Нові спрощені діаграми для статистики гравців
     createSimplePlayerChart() {
         const ctx = document.getElementById('simple-player-chart')?.getContext('2d');
         if (!ctx) return;
@@ -333,8 +324,7 @@ class ChartManager {
         
         const battles = this.dataManager.getBattlesArray();
         const playerStats = {};
-        
-        // Збираємо просту статистику по гравцях
+
         battles.forEach(battle => {
             if (!battle.players) return;
             
@@ -355,8 +345,7 @@ class ChartManager {
                 stats.kills += player.kills || 0;
             });
         });
-        
-        // Обраховуємо середні показники і сортуємо за шкодою (від більшої до меншої)
+
         const sortedPlayers = Object.entries(playerStats)
             .map(([name, stats]) => ({
                 name,
@@ -447,8 +436,7 @@ class ChartManager {
         
         const battles = this.dataManager.getBattlesArray();
         const playerStats = {};
-        
-        // Збираємо просту статистику перемог по гравцях
+
         battles.forEach(battle => {
             if (!battle.players) return;
             
@@ -467,15 +455,14 @@ class ChartManager {
                 if (battle.win === 1) stats.wins++;
             });
         });
-        
-        // Обраховуємо відсоток перемог і сортуємо від більшого до меншого
+
         const sortedPlayers = Object.entries(playerStats)
             .map(([name, stats]) => ({
                 name,
                 winRate: (stats.wins / stats.battles * 100) || 0,
                 battles: stats.battles
             }))
-            .filter(p => p.battles >= 2) // Мінімум 2 бої для статистичної значущості
+            .filter(p => p.battles >= 2) 
             .sort((a, b) => b.winRate - a.winRate);
         
         const playerNames = sortedPlayers.map(p => p.name);
@@ -486,7 +473,6 @@ class ChartManager {
         this.charts.playerWinRate.update();
     }
 
-    // Нові спрощені діаграми для статистики техніки
     createSimpleVehicleChart() {
         const ctx = document.getElementById('simple-vehicle-chart')?.getContext('2d');
         if (!ctx) return;
@@ -558,8 +544,7 @@ class ChartManager {
         
         const battles = this.dataManager.getBattlesArray();
         const vehicleStats = {};
-        
-        // Збираємо просту статистику по техніці
+
         battles.forEach(battle => {
             if (!battle.players) return;
             
@@ -578,8 +563,6 @@ class ChartManager {
                 vehicleStats[vehicle].damage += player.damage || 0;
             });
         });
-        
-        // Відбираємо тільки техніку з мінімум 2 боями і сортуємо за середньою шкодою
         const sortedVehicles = Object.entries(vehicleStats)
             .filter(([_, stats]) => stats.battles >= 2)
             .map(([name, stats]) => ({
@@ -588,7 +571,7 @@ class ChartManager {
                 battles: stats.battles
             }))
             .sort((a, b) => b.avgDamage - a.avgDamage)
-            .slice(0, 8); // обмежуємо до 8 танків для кращої наочності
+            .slice(0, 8); 
         
         this.charts.simpleVehicle.data.labels = sortedVehicles.map(v => v.name);
         this.charts.simpleVehicle.data.datasets[0].data = sortedVehicles.map(v => v.avgDamage);
@@ -667,8 +650,7 @@ class ChartManager {
         
         const battles = this.dataManager.getBattlesArray();
         const vehicleStats = {};
-        
-        // Збираємо просту статистику перемог по техніці
+
         battles.forEach(battle => {
             if (!battle.players) return;
             
@@ -687,31 +669,28 @@ class ChartManager {
                 if (battle.win === 1) vehicleStats[vehicle].wins++;
             });
         });
-        
-        // Обраховуємо відсоток перемог і сортуємо від більшого до меншого
+
         const sortedVehicles = Object.entries(vehicleStats)
-            .filter(([_, stats]) => stats.battles >= 2) // Мінімум 2 бої для статистичної значущості
+            .filter(([_, stats]) => stats.battles >= 2) 
             .map(([name, stats]) => ({
                 name,
                 winRate: (stats.wins / stats.battles * 100) || 0,
                 battles: stats.battles
             }))
             .sort((a, b) => b.winRate - a.winRate)
-            .slice(0, 8); // обмежуємо до 8 танків для кращої наочності
+            .slice(0, 8); 
         
         this.charts.vehicleWinRate.data.labels = sortedVehicles.map(v => v.name);
         this.charts.vehicleWinRate.data.datasets[0].data = sortedVehicles.map(v => v.winRate);
         this.charts.vehicleWinRate.update();
     }
 
-    // Діаграма для внеску гравців у бій
     updateBattleContributionChart(battle) {
         if (!battle || !battle.players) return;
         
         const ctx = document.getElementById('battle-contribution-chart')?.getContext('2d');
         if (!ctx) return;
-        
-        // Збираємо дані про внесок гравців
+
         const playerNames = [];
         const playerDamage = [];
         const playerKills = [];
@@ -722,7 +701,6 @@ class ChartManager {
             playerKills.push(playerData.kills || 0);
         });
         
-        // Оновлюємо або створюємо діаграму
         if (this.charts.battleContribution) {
             this.charts.battleContribution.destroy();
         }

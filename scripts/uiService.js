@@ -163,7 +163,7 @@ class UIService {
       event.stopImmediatePropagation();
 
       if (this.isProcessing.refresh) {
-        console.log('Refresh already in progress');
+        // console.log('Refresh already in progress');
         return;
       }
 
@@ -177,7 +177,7 @@ class UIService {
         this.core.saveState();
 
       } catch (error) {
-        console.error('Помилка при оновленні даних:', error);
+        console.error('Error updating data:', error);
         this.handleError(error);
       } finally {
         this.isProcessing.refresh = false;
@@ -231,7 +231,7 @@ class UIService {
         this.resetTeamStatsUI();
 
       } catch (error) {
-        console.error('Помилка при видаленні статистики:', error);
+        console.error('Error when deleting statistics:', error);
         this.handleError(error);
       } finally {
         this.isProcessing.removeHistory = false;

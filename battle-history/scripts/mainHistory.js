@@ -42,7 +42,7 @@ class MainHistory {
             this.uiHandler.initializeUI();
         } catch (error) {
             console.error('Error in initialize:', error);
-            this.showError('Помилка при завантаженні даних');
+            this.showError('Error loading data');
         }
     }
 
