@@ -155,10 +155,10 @@ class UIService {
     let isLoading = false;
     
     refreshBtn.addEventListener('click', async () => {
-      if (isLoading) {
-        alert('Оновлення вже виконується, зачекайте будь ласка.');
-        return;
-      }
+      // if (isLoading) {
+      //   alert('Оновлення вже виконується, зачекайте будь ласка.');
+      //   return;
+      // }
 
       try {
         isLoading = true;
@@ -187,10 +187,10 @@ class UIService {
     let isDeleting = false;
   
     restoreBtn.addEventListener('click', async () => {
-      if (isDeleting) {
-        alert('Процес видалення вже виконується, зачекайте будь ласка.');
-        return;
-      }
+      // if (isDeleting) {
+      //   alert('Процес видалення вже виконується, зачекайте будь ласка.');
+      //   return;
+      // }
 
       if (!confirm('Видалити поточну статистику історії боїв?')) {
         return;
@@ -212,7 +212,6 @@ class UIService {
         this.updatePlayersUI();
         
         localStorage.clear();
-        // Примусово обнуляємо командну статистику
         this.resetTeamStatsUI();
 
       } catch (error) {
@@ -245,7 +244,7 @@ class UIService {
     };
 
     const message = errorMessages[error.message] || `Помилка: ${error.message}`;
-    alert(message);
+    // alert(message);
   }
 }
 
