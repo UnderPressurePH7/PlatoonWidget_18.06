@@ -580,10 +580,27 @@ class CoreService {
     }
   }
   
-  handleServerTime(serverTime) {
+  async handleServerTime(serverTime) {
     if (!serverTime || !this.isValidBattleState()) return;
+    
     const currentTime = Date.now();
-    console.log(`Current server time: ${serverTime}, Local time: ${currentTime}`);
+    
+    if (!this.lastUpdateTime) {
+      this.lastUpdateTime = currentTime;
+      // console.log(`Current server time: ${serverTime}, Local time: ${currentTime}`);
+      return;
+    }
+    
+    if (currentTime - this.lastUpdateTime >= 180000) {
+      // console.log(`Current server time: ${serverTime}, Local time: ${currentTime}`);
+      this.lastUpdateTime = currentTime;
+
+    await Utils.getRandomDelay();
+    
+    if (this.isExistsPlayerRecord()) {
+      this.serverDataDebounced();
+    }
+    }
   }
 
   handleOnAnyDamage(onDamageData) {
