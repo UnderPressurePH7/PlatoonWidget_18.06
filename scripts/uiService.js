@@ -195,6 +195,8 @@ class UIService {
         if (!confirm('Видалити поточну статистику історії боїв?')) {
           return;
         }
+        
+        alert('Це не зворотня дія, видалити?.');
 
         try {
           isDeleting = true;
