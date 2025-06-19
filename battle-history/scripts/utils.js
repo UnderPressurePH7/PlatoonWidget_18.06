@@ -1,4 +1,4 @@
-import { CONFIG } from './constants.js';
+import { CONFIG } from '../utils/constants.js';
 
 export class Utils {
   static sleep(ms) {

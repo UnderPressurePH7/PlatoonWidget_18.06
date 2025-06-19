@@ -1,6 +1,6 @@
 import CoreService from './coreService.js';
 import UIService from './uiService.js';
-import { STATS } from '../battle-history/utils/constants.js';
+import { STATS } from '../battle-history/scripts/constants.js';
 
 export default class SquadWidget {
   constructor() {

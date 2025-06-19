@@ -1,6 +1,6 @@
-import EventEmitter from './utils/eventEmitter.js';
-import { StateManager } from './utils/stateManager.js';
-import { GAME_POINTS, STATS } from './utils/constants.js';
+import EventEmitter from './eventEmitter.js';
+import { StateManager } from './stateManager.js';
+import { GAME_POINTS, STATS } from './constants.js';
 
 class BattleDataManager {
   constructor() {
