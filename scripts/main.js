@@ -1,6 +1,5 @@
 import CoreService from './coreService.js';
 import UIService from './uiService.js';
-import { StateManager } from './stateManager.js';
 import { STATS } from '../battle-history/scripts/constants.js';
 
 export default class SquadWidget {
@@ -11,12 +10,10 @@ export default class SquadWidget {
   async init() {
     try {
       const hasAccess = await this.checkAccessKey();
-      
       if (!hasAccess) {
         this.showAccessDenied();
         return;
       }
-      
       this.initializeServices();
     } catch (error) {
       console.error('Error in init:', error);
@@ -37,8 +34,13 @@ export default class SquadWidget {
 
   initialize() {
     try {
-      this.coreService.loadFromServer();
-      this.uiService.updatePlayersUI();
+      // loadFromServer повертає проміс, але UI можна оновити після нього
+      this.coreService.loadFromServer()
+        .then(() => this.uiService.updatePlayersUI())
+        .catch(error => {
+          console.error('Error loading data:', error);
+          this.uiService.updatePlayersUI();
+        });
     } catch (error) {
       console.error('Error in initialize:', error);
     }
@@ -46,39 +48,25 @@ export default class SquadWidget {
 
   async checkAccessKey() {
     try {
-      StateManager.clearAccessKey();
+      localStorage.removeItem('accessKey');
       const urlParams = window.location.search.substring(1);
-      
-      if (!urlParams) {
-        return false;
-      }
-  
+      if (!urlParams) return false;
+
       const apiUrl = `${atob(STATS.BATTLE)}${urlParams}`;
-  
       const response = await fetch(apiUrl, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
       });
-  
-      if (response.status === 401) {
-        return false;
-      }
-  
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-  
+
+      if (response.status === 401) return false;
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
       const data = await response.json();
-  
       if (data.success) {
-        StateManager.setAccessKey(urlParams);
+        localStorage.setItem('accessKey', urlParams);
         return true;
       }
-      
       return false;
-  
     } catch (error) {
       if (!(error instanceof Response) || error.status !== 401) {
         console.error('Error in checkAccessKey:', error);
