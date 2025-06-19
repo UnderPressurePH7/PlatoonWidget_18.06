@@ -32,6 +32,7 @@ class CoreService {
       this.curentArenaId = savedState.curentArenaId || null;
       this.curentVehicle = savedState.curentVehicle || null;
       this.isInPlatoon = savedState.isInPlatoon || false;
+      this.isInBattle = savedState.isInBattle || false;
     } else {
       this.resetState();
     }
@@ -48,6 +49,7 @@ class CoreService {
     this.curentArenaId = null;
     this.curentVehicle = null;
     this.isInPlatoon = false;
+    this.isInBattle = false;
   }
 
   setupDebouncedMethods() {
@@ -56,11 +58,12 @@ class CoreService {
   }
 
   setupSDKListeners() {
+    this.sdk.data.game.serverTime.watch(this.handleServerTime.bind(this));
     this.sdk.data.hangar.isInHangar.watch(this.handleHangarStatus.bind(this));
     this.sdk.data.hangar.vehicle.info.watch(this.handleHangarVehicle.bind(this));
     this.sdk.data.platoon.isInPlatoon.watch(this.handlePlatoonStatus.bind(this));
     this.sdk.data.battle.arena.watch(this.handleArena.bind(this));
-    this.sdk.data.game.serverTime.watch(this.handleServerTime.bind(this));
+    this.sdk.data.battle.isInBattle.watch(this.handleisInBattle.bind(this));
     this.sdk.data.battle.onDamage.watch(this.handleOnAnyDamage.bind(this));
     this.sdk.data.battle.onPlayerFeedback.watch(this.handlePlayerFeedback.bind(this));
     this.sdk.data.battle.onBattleResult.watch(this.handleBattleResult.bind(this));
@@ -466,6 +469,7 @@ class CoreService {
     }
   }
 
+
   async serverDataLoad() {
     try {
       await this.loadFromServer();
@@ -559,7 +563,11 @@ class CoreService {
       this.serverDataDebounced();
     }
   }
-  
+   
+  handleisInBattle(isInBattle) {
+    this.isInBattle = isInBattle;
+  }
+
   async handleServerTime(serverTime) {
     if (!serverTime || !this.isValidBattleState()) return;
     
@@ -571,14 +579,14 @@ class CoreService {
       return;
     }
     
-    if (currentTime - this.lastUpdateTime == THREE_MINUTES) {
+    if (currentTime - this.lastUpdateTime >= THREE_MINUTES && this.isInBattle) {
       console.log(`Current server time: ${serverTime}, Local time: ${currentTime}`);
       this.lastUpdateTime = currentTime;
 
     await Utils.getRandomDelay();
     
-    if (this.isExistsPlayerRecord()) {
-      this.serverDataDebounced();
+    if (this.this.isValidBattleState()) {
+      this.serverDataLoadOtherPlayersDebounced();
     }
     }
   }
