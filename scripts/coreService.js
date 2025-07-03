@@ -471,6 +471,13 @@ class CoreService {
     }
   }
 
+  async refreshLocalData() {
+    this.clearState();
+    await Utils.sleep(10);
+    await this.loadFromServer();
+    await Utils.sleep(10);
+    this.saveState();
+  } 
 
   async serverDataLoad() {
     try {
@@ -544,10 +551,12 @@ class CoreService {
     this.curentVehicle = hangareVehicleData.localizedShortName || 'Unknown Vehicle';
   }
 
-  handleArena(arenaData) {
+  async handleArena(arenaData) {
     if (!arenaData) return;
 
     this.curentArenaId = this.sdk?.data?.battle?.arenaId?.value ?? null;
+
+    await refreshLocalData(); // TESTING
 
     if (this.curentArenaId == null) return;
     if (this.curentPlayerId == null) return;

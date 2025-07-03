@@ -1,6 +1,7 @@
 import EventEmitter from './eventEmitter.js';
 import { StateManager } from './stateManager.js';
 import { GAME_POINTS, STATS } from './constants.js';
+import { Utils } from '../battle-history/scripts/utils.js';
 
 class BattleDataManager {
   constructor() {
@@ -28,9 +29,6 @@ class BattleDataManager {
     this.PlayersInfo = {};
   }
 
-  sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
 
   getAccessKey() {
     return StateManager.getAccessKey();
@@ -318,9 +316,9 @@ class BattleDataManager {
 
   async refreshLocalData() {
     this.clearState();
-    await this.sleep(10);
+    await Utils.sleep(10);
     await this.loadFromServer();
-    await this.sleep(10);
+    await Utils.sleep(10);
     this.saveState();
   }
 
