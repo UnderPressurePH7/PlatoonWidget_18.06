@@ -476,6 +476,7 @@ class CoreService {
     await Utils.sleep(10);
     await this.loadFromServer();
     await Utils.sleep(10);
+    this.eventsCore.emit('statsUpdated');
     this.saveState();
   } 
 
