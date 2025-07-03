@@ -574,6 +574,7 @@ class CoreService {
 
     if (period.tag == "PREBATTLE") {
       this.lastUpdateTime = Date.now();
+      this.eventsCore.emit('statsUpdated');
     }
   }
 
@@ -589,7 +590,6 @@ class CoreService {
 
     await Utils.getRandomDelay();
     this.serverDataLoadOtherPlayersDebounced();
-
     }
   }
 
