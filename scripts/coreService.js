@@ -551,12 +551,10 @@ class CoreService {
     this.curentVehicle = hangareVehicleData.localizedShortName || 'Unknown Vehicle';
   }
 
-  async handleArena(arenaData) {
+  handleArena(arenaData) {
     if (!arenaData) return;
 
     this.curentArenaId = this.sdk?.data?.battle?.arenaId?.value ?? null;
-
-    await refreshLocalData(); // TESTING
 
     if (this.curentArenaId == null) return;
     if (this.curentPlayerId == null) return;
@@ -574,8 +572,11 @@ class CoreService {
     }
   }
    
-  handleisInBattle(isInBattle) {
+  async handleisInBattle(isInBattle) {
     this.isInBattle = isInBattle;
+
+    await Utils.getRandomDelay()
+    await refreshLocalData(); // TESTING
   }
 
   handlePeriod(period) {
