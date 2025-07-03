@@ -577,7 +577,7 @@ class CoreService {
     this.isInBattle = isInBattle;
 
     await Utils.getRandomDelay()
-    await refreshLocalData(); // TESTING
+    await this.refreshLocalData(); // TESTING
   }
 
   handlePeriod(period) {
