@@ -169,15 +169,17 @@ class BattleDataManager {
       if (!accessKey) {
         throw new Error('Access key not found');
       }
-
+      
       await this.makeServerRequest(`${atob(STATS.BATTLE)}${accessKey}\\${battleId}`, {
         method: 'DELETE'
       });
 
-      if (this.BattleStats[battleId]) {
-        delete this.BattleStats[battleId];
-        this.saveState();
-      }
+      await this.refreshLocalData();
+
+      // if (this.BattleStats[battleId]) {
+      //   delete this.BattleStats[battleId];
+      //   this.saveState();
+      // }
 
       this.eventsHistory.emit('battleDeleted', battleId);
       return true;
