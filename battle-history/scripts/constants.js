@@ -5,8 +5,8 @@ export const GAME_POINTS = {
 };
 
 export const STATS = {
-    BATTLE: "aHR0cHM6Ly9ub2RlLXNlcnZlcmpzLTUyY2Y0MTgyNmY3MS5oZXJva3VhcHAuY29tL2FwaS9iYXR0bGUtc3RhdHMv",
-    STATUS: "aHR0cHM6Ly9ub2RlLXNlcnZlcmpzLTUyY2Y0MTgyNmY3MS5oZXJva3VhcHAuY29tL2FwaS9zdGF0dXM="
+    BATTLE: "aHR0cHM6Ly9ub2Rlc2VydmVyLWZmYjY0NTAxZDhlZi5oZXJva3VhcHAuY29tL2FwaS9iYXR0bGUtc3RhdHMv",
+    STATUS: "aHR0cHM6Ly9ub2Rlc2VydmVyLWZmYjY0NTAxZDhlZi5oZXJva3VhcHAuY29tL2FwaS9zdGF0dXM="
 };
 
 export const CONFIG = {
