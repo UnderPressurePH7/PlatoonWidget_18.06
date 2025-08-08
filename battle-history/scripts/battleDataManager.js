@@ -1,7 +1,7 @@
 import EventEmitter from './eventEmitter.js';
 import { StateManager } from './stateManager.js';
 import { GAME_POINTS, STATS } from './constants.js';
-import { Utils } from '../battle-history/scripts/utils.js';
+import { Utils } from './utils.js';
 
 class BattleDataManager {
   constructor() {
@@ -369,5 +369,6 @@ class BattleDataManager {
     });
   }
 }
+
 
 export default BattleDataManager;
